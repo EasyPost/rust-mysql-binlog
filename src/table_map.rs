@@ -4,13 +4,17 @@ use crate::column_types::ColumnType;
 
 
 #[derive(Debug)]
+/// Opaque reference to a table map, intended to be consumed by [`Event`]
 pub struct SingleTableMap {
-    pub schema_name: String,
-    pub table_name: String,
-    pub columns: Vec<ColumnType>,
+    pub(crate) schema_name: String,
+    pub(crate) table_name: String,
+    pub(crate) columns: Vec<ColumnType>,
 }
 
 
+/// A MySQL binary log includes Table Map events; the first time a table is referenced in a given
+/// binlog, a TME will be emitted describing the fields of that table and assigning them to a
+/// binlog-unique identifier. The TableMap object is used to keep track of that mapping.
 pub struct TableMap {
     inner: BTreeMap<u64, SingleTableMap>
 }

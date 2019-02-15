@@ -7,6 +7,9 @@ use serde_json;
 
 
 #[derive(Debug)]
+/// Wrapper for the SQL BLOB (Binary Large OBject) type
+///
+/// Serializes as Base64
 pub struct Blob(Vec<u8>);
 
 impl From<Vec<u8>> for Blob {
@@ -26,6 +29,7 @@ impl Serialize for Blob {
 
 
 #[derive(Debug, Serialize)]
+/// Normalized representation of types which are present in MySQL
 pub enum MySQLValue {
     SignedInteger(i64),
     Float(f32),

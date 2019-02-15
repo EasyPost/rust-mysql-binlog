@@ -8,7 +8,9 @@ use crate::event::{Event,TypeCode};
 use crate::errors::{BinlogParseError,EventParseError};
 
 
-/// Low level wrapper around a single Binlog file
+/// Low level wrapper around a single Binlog file. Use this if you
+/// want to introspect all events (including internal events like the FDE
+/// and TME)
 pub struct BinlogFile<I: Seek + Read> {
     file_name: Option<PathBuf>,
     file: I,
@@ -34,17 +36,17 @@ impl<I: Seek+Read> BinlogEvents< I> {
 }
 
 impl<I: Seek+Read> Iterator for BinlogEvents<I> {
-    type Item = Event;
+    type Item = Result<Event, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let event = match self.offset {
             Some(offset) => match self.file.read_at(offset) {
                 Ok(e) => e,
-                Err(ref e) => {
+                Err(e) => {
                     if let Some(_e) = e.downcast_ref::<EventParseError>() {
                         return None
                     }
-                    panic!("error reading binlog entry: {:?}", e)
+                    return Some(Err(e))
                 }
             },
             None => return None
@@ -54,7 +56,7 @@ impl<I: Seek+Read> Iterator for BinlogEvents<I> {
         } else {
             self.offset = Some(event.next_position());
         }
-        Some(event)
+        Some(Ok(event))
     }
 }
 
