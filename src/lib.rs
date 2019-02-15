@@ -6,6 +6,7 @@ extern crate base64;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate serde_json;
 
+use std::fs::File;
 use std::io::{Read, Seek};
 use std::path::Path;
 
@@ -41,30 +42,30 @@ impl serde::Serialize for Gtid {
 
 #[derive(Debug, Serialize)]
 pub struct BinlogEvent {
-    type_code: event::TypeCode,
-    timestamp: u32,
-    gtid: Option<Gtid>,
+    pub type_code: event::TypeCode,
+    pub timestamp: u32,
+    pub gtid: Option<Gtid>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    schema_name: Option<String>,
+    pub schema_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    table_name: Option<String>,
+    pub table_name: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    rows: Vec<event::RowEvent>,
+    pub rows: Vec<event::RowEvent>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    query: Option<String>,
+    pub query: Option<String>,
 }
 
 
-struct EventIterator<BR: Read+Seek> {
+pub struct EventIterator<BR: Read+Seek> {
     events: binlog_file::BinlogEvents<BR>,
     table_map: table_map::TableMap,
     current_gtid: Option<Gtid>,
 }
 
 impl<BR: Read+Seek> EventIterator<BR> {
-    fn new(bf: binlog_file::BinlogFile<BR>) -> Self {
+    fn new(bf: binlog_file::BinlogFile<BR>, start_offset: Option<u64>) -> Self {
         EventIterator {
-            events: bf.events(None),
+            events: bf.events(start_offset),
             table_map: table_map::TableMap::new(),
             current_gtid: None,
         }
@@ -127,17 +128,34 @@ impl<BR: Read+Seek> Iterator for EventIterator<BR> {
 }
 
 
+pub struct BinlogFileParserBuilder<BR: Read+Seek> {
+    bf: binlog_file::BinlogFile<BR>,
+    start_position: Option<u64>,
+}
+
+impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
+    pub fn start_position(mut self, pos: u64) -> Self {
+        self.start_position = Some(pos);
+        self
+    }
+
+    pub fn events(self) -> EventIterator<BR> {
+        EventIterator::new(self.bf, self.start_position)
+    }
+}
+
+
 /// parse all events in a given Read instance
-pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<impl Iterator<Item=Result<BinlogEvent, failure::Error>>, failure::Error> {
+pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<BinlogFileParserBuilder<R>, failure::Error> {
     let bf = binlog_file::BinlogFile::from_reader(r)?;
-    Ok(EventIterator::new(bf))
+    Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
 }
 
 
 /// parse all events in the file living at a given path
-pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<impl Iterator<Item=Result<BinlogEvent, failure::Error>>, failure::Error> {
+pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<BinlogFileParserBuilder<File>, failure::Error> {
     let bf = binlog_file::BinlogFile::try_from_path(file_name.as_ref())?;
-    Ok(EventIterator::new(bf))
+    Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
 }
 
 
