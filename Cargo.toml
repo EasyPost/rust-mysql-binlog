@@ -1,0 +1,16 @@
+[package]
+name = "rust-mysql-binlog"
+version = "0.1.0"
+authors = ["James Brown <jbrown@easypost.com>"]
+edition = "2018"
+
+[dependencies]
+byteorder = "1"
+uuid = "0.6"
+base64 = "0.10"
+failure = "0.1"
+serde_json = "1"
+serde = "1"
+serde_derive = "1"
+bigdecimal = { version="^0.0.15", features=["serde"] }
+
