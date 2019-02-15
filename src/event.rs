@@ -5,7 +5,7 @@ use byteorder::{ByteOrder,ReadBytesExt,LittleEndian};
 use uuid::Uuid;
 use failure::Error;
 
-use crate::errors::{EventParseError,ColumnParseError};
+use crate::errors::EventParseError;
 use crate::bit_set::BitSet;
 use crate::column_types::ColumnType;
 use crate::table_map::{TableMap,SingleTableMap};
@@ -100,6 +100,25 @@ impl TypeCode {
 }
 
 
+#[derive(Debug,Serialize)]
+pub enum ChecksumAlgorithm {
+    None,
+    CRC32,
+    Other(u8),
+}
+
+
+impl From<u8> for ChecksumAlgorithm {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0x00 => ChecksumAlgorithm::None,
+            0x01 => ChecksumAlgorithm::CRC32,
+            other => ChecksumAlgorithm::Other(other)
+        }
+    }
+}
+
+
 pub type RowData = Vec<Option<MySQLValue>>;
 
 
@@ -107,7 +126,7 @@ pub type RowData = Vec<Option<MySQLValue>>;
 pub enum EventData {
     GtidLogEvent { flags: u8, uuid: Uuid, coordinate: u64 },
     QueryEvent { thread_id: u32, exec_time: u32, error_code: i16, schema: String, query: String },
-    FormatDescriptionEvent { binlog_version: u16, server_version: String, create_timestamp: u32, common_header_len: u8 },
+    FormatDescriptionEvent { binlog_version: u16, server_version: String, create_timestamp: u32, common_header_len: u8, checksum_algorithm: ChecksumAlgorithm},
     TableMapEvent { table_id: u64, schema_name: String, table_name: String, columns: Vec<ColumnType>, null_bitmap: BitSet },
     WriteRowsEvent { table_id: u64, rows: Vec<RowEvent> },
     UpdateRowsEvent { table_id: u64, rows: Vec<RowEvent> },
@@ -215,17 +234,27 @@ impl EventData {
         match type_code {
             TypeCode::FormatDescriptionEvent => {
                 let binlog_version = cursor.read_u16::<LittleEndian>()?;
+                if binlog_version != 4 {
+                    unimplemented!("can only parse a version 4 binary log");
+                }
                 let mut server_version_buf = [0u8; 50];
                 cursor.read_exact(&mut server_version_buf)?;
                 let server_version = ::std::str::from_utf8(server_version_buf.split(|c| *c == 0x00).next().unwrap_or(&[])).unwrap().to_owned();
                 let create_timestamp = cursor.read_u32::<LittleEndian>()?;
                 let common_header_len = cursor.read_u8()?;
-                let event_types = data.len() - 2 - 50 - 4 - 1;
+                let event_types = data.len() - 2 - 50 - 4 - 1 - 5;
                 let mut event_sizes_tables = vec![0u8; event_types];
                 cursor.read_exact(&mut event_sizes_tables)?;
-                //println!("event sizes: {:?}", event_sizes_tables);
-                // ignore the per-event data lengths for now
-                Ok(Some(EventData::FormatDescriptionEvent { binlog_version, server_version, create_timestamp, common_header_len }))
+                let checksum_algo = ChecksumAlgorithm::from(cursor.read_u8()?);
+                let mut checksum_buf = [0u8; 4];
+                cursor.read_exact(&mut checksum_buf)?;
+                Ok(Some(EventData::FormatDescriptionEvent {
+                    binlog_version,
+                    server_version,
+                    create_timestamp,
+                    common_header_len,
+                    checksum_algorithm: checksum_algo
+                }))
             }
             TypeCode::GtidLogEvent => {
                 let flags = cursor.read_u8()?;
@@ -240,7 +269,7 @@ impl EventData {
                 let execution_time  = cursor.read_u32::<LittleEndian>()?;
                 let schema_len = cursor.read_u8()?;
                 let error_code = cursor.read_i16::<LittleEndian>()?;
-                let status_vars = read_two_byte_length_prefixed_bytes(&mut cursor)?;
+                let _status_vars = read_two_byte_length_prefixed_bytes(&mut cursor)?;
                 let schema = String::from_utf8_lossy(&read_nbytes(&mut cursor, schema_len)?).into_owned();
                 cursor.seek(io::SeekFrom::Current(1))?;
                 let mut statement = String::new();
@@ -277,7 +306,6 @@ impl EventData {
                 let null_bitmask_size = (num_columns + 7) >> 3;
                 let null_bitmap_source = read_nbytes(&mut cursor, null_bitmask_size)?;
                 let nullable_bitmap = BitSet::from_slice(num_columns, &null_bitmap_source).unwrap();
-                let pos = cursor.tell()? as usize;
                 Ok(Some(EventData::TableMapEvent { table_id, schema_name, table_name, columns: final_columns, null_bitmap: nullable_bitmap }))
             }
             TypeCode::WriteRowsEventV1 | TypeCode::WriteRowsEventV2 => {
@@ -372,5 +400,13 @@ impl Event {
 
     pub fn data(&self) -> &Vec<u8> {
         &self.data
+    }
+
+    pub fn flags(&self) -> u16 {
+        self.flags
+    }
+
+    pub fn event_length(&self) -> u32 {
+        self.event_length
     }
 }

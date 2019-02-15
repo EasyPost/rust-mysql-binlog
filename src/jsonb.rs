@@ -117,7 +117,7 @@ fn parse_maybe_inlined_value(cursor: &mut Cursor<Vec<u8>>, compound_size: Compou
 
 fn parse_compound(mut cursor: &mut Cursor<Vec<u8>>, compound_size: CompoundSize, compound_type: CompoundType) -> Result<JsonValue, Error> {
     let start_offset = cursor.position();
-    let (elems, byte_size) = match compound_size {
+    let (elems, _byte_size) = match compound_size {
         CompoundSize::Small => (u32::from(cursor.read_u16::<LittleEndian>()?), u32::from(cursor.read_u16::<LittleEndian>()?)),
         CompoundSize::Large => (cursor.read_u32::<LittleEndian>()?, cursor.read_u32::<LittleEndian>()?),
     };

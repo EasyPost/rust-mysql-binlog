@@ -1,10 +1,26 @@
+//! Parser for the MySQL binary log format. Targets MySQL 5.6 and 5.7.
+//!
+//! # Example
+//!
+//! A simple command line event parser and printer
+//!
+//! ```no_run
+//! use mysql_binlog;
+//!
+//!
+//! fn main() {
+//!     for event in mysql_binlog.parse_file("bin-log.000001").unwrap().events() {
+//!         println!("{"?}", event.unwrap()
+//!     }
+//! }
+//! ```
 extern crate byteorder;
 extern crate uuid;
 extern crate base64;
 #[macro_use] extern crate failure;
-#[macro_use] extern crate serde;
+extern crate serde;
 #[macro_use] extern crate serde_derive;
-#[macro_use] extern crate serde_json;
+extern crate serde_json;
 
 use std::fs::File;
 use std::io::{Read, Seek};
@@ -41,6 +57,7 @@ impl serde::Serialize for Gtid {
 
 
 #[derive(Debug, Serialize)]
+/// A binlog event as returned by EventIterator
 pub struct BinlogEvent {
     pub type_code: event::TypeCode,
     pub timestamp: u32,
@@ -77,7 +94,6 @@ impl<BR: Read+Seek> Iterator for EventIterator<BR> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(event) = self.events.next() {
-            println!("event: {:?}", event);
             match event.inner(Some(&self.table_map)) {
                 Ok(Some(e)) => {
                     match e {

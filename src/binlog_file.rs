@@ -8,6 +8,7 @@ use crate::event::{Event,TypeCode};
 use crate::errors::{BinlogParseError,EventParseError};
 
 
+/// Low level wrapper around a single Binlog file
 pub struct BinlogFile<I: Seek + Read> {
     file_name: Option<PathBuf>,
     file: I,
@@ -106,5 +107,9 @@ impl<I: Seek+Read> BinlogFile<I> {
     pub fn events(self, offset: Option<u64>) -> BinlogEvents<I> {
         let offset = offset.unwrap_or(self.first_event_offset);
         BinlogEvents::new(self, offset)
+    }
+
+    pub fn file_name(&self) -> Option<&Path> {
+        self.file_name.as_ref().map(|a| a.as_ref())
     }
 }

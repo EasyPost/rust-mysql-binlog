@@ -77,7 +77,7 @@ impl ColumnType {
             253 => ColumnType::VarString,   // not implemented
             254 => ColumnType::MyString,
             255 => ColumnType::Geometry(0),   // not implemented
-            i => panic!("unhandled column type {}", i),
+            i => unimplemented!("unhandled column type {}", i),
         }
     }
 
@@ -144,7 +144,7 @@ impl ColumnType {
         })
     }
 
-    pub(crate) fn read_value<R: Read>(&self, r: &mut R) -> Result<MySQLValue, Error> {
+    pub fn read_value<R: Read>(&self, r: &mut R) -> Result<MySQLValue, Error> {
         match self {
             &ColumnType::Tiny => {
                 Ok(MySQLValue::SignedInteger(i64::from(r.read_i8()?)))
@@ -273,7 +273,7 @@ impl ColumnType {
                 } else if length == 8 {
                     Ok(MySQLValue::Double(r.read_f64::<LittleEndian>()?))
                 } else {
-                    panic!("wtf is a {}-byte float?", length)
+                    unimplemented!("wtf is a {}-byte float?", length)
                 }
             }
             &ColumnType::NewDecimal(precision, decimal_places) => {
@@ -284,7 +284,7 @@ impl ColumnType {
                 let enum_value = match (length_bytes & 0xff) as u8 {
                     0x01 => i16::from(r.read_i8()?),
                     0x02 => r.read_i16::<LittleEndian>()?,
-                    i => panic!("unhandled Enum pack_length {:?}", i),
+                    i => unimplemented!("unhandled Enum pack_length {:?}", i),
                 };
                 Ok(MySQLValue::Enum(enum_value))
             },
@@ -298,8 +298,7 @@ impl ColumnType {
                 Err(ColumnParseError::UnimplementedTypeError { column_type: self.clone() }.into())
             },
             &ColumnType::Decimal | &ColumnType::NewDate | &ColumnType::Bit(..) | &ColumnType::Set | &ColumnType::Geometry(..) => {
-                eprintln!("unhandled value type: {:?}", self);
-                unimplemented!();
+                unimplemented!("unhandled value type: {:?}", self);
             }
         }
     }
