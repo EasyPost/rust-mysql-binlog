@@ -11,7 +11,7 @@
 //!
 //! ```no_run
 //! fn main() {
-//!     for event in mysql_binlog::parse_file("bin-log.000001").unwrap().events() {
+//!     for event in mysql_binlog::parse_file("bin-log.000001").unwrap() {
 //!         println!("{:?}", event.unwrap());
 //!     }
 //! }
@@ -160,7 +160,21 @@ pub struct BinlogFileParserBuilder<BR: Read+Seek> {
     start_position: Option<u64>,
 }
 
+impl BinlogFileParserBuilder<File> {
+    /// Construct a new BinlogFileParserBuilder from some path
+    pub fn try_from_path<P: AsRef<Path>>(file_name: P) -> Result<Self, failure::Error> {
+        let bf = binlog_file::BinlogFile::try_from_path(file_name.as_ref())?;
+        Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
+    }
+}
+
 impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
+    /// Construct a new BinlogFileParserBuilder from some object implementing Read and Seek
+    pub fn try_from_reader(r: BR) -> Result<Self, failure::Error> {
+        let bf = binlog_file::BinlogFile::try_from_reader(r)?;
+        Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
+    }
+
     /// Set the start position to begin emitting events. NOTE: The beginning of the binlog will
     /// always be read first for the FDE. NOTE: Column mappings may be incorrect if you use this
     /// functionality, as TMEs may be missed.
@@ -182,9 +196,8 @@ impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
 ///
 /// - returns an immediate error if the Read does not begin with a valid Format Descriptor Event
 /// - each call to the iterator can return an error if there is an I/O or parsing error
-pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<BinlogFileParserBuilder<R>, failure::Error> {
-    let bf = binlog_file::BinlogFile::try_from_reader(r)?;
-    Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
+pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<EventIterator<R>, failure::Error> {
+    BinlogFileParserBuilder::try_from_reader(r).map(|b| b.events())
 }
 
 
@@ -194,9 +207,8 @@ pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<BinlogFileParserBu
 ///
 /// - returns an immediate error if the file could not be opened or if it does not contain a valid Format Desciptor Event
 /// - each call to the iterator can return an error if there is an I/O or parsing error
-pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<BinlogFileParserBuilder<File>, failure::Error> {
-    let bf = binlog_file::BinlogFile::try_from_path(file_name.as_ref())?;
-    Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
+pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<EventIterator<File>, failure::Error> {
+    BinlogFileParserBuilder::try_from_path(file_name).map(|b| b.events())
 }
 
 
@@ -206,7 +218,7 @@ mod tests{
 
     #[test]
     fn test_parse_file() {
-        let results = parse_file("test_data/bin-log.000001").unwrap().events().collect::<Result<Vec<_>, _>>().unwrap();
+        let results = parse_file("test_data/bin-log.000001").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(results.len(), 5);
         assert_eq!(results[0].type_code, TypeCode::QueryEvent);
         assert_eq!(results[0].query, Some("CREATE TABLE foo(id BIGINT AUTO_INCREMENT PRIMARY KEY, val_decimal DECIMAL(10, 5) NOT NULL, comment VARCHAR(255) NOT NULL)".to_owned()));
@@ -215,7 +227,7 @@ mod tests{
     #[test]
     fn test_parse_reader() {
         let f = std::fs::File::open("test_data/bin-log.000001").unwrap();
-        let results = parse_reader(f).unwrap().events().collect::<Result<Vec<_>, _>>().unwrap();
+        let results = parse_reader(f).unwrap().collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(results.len(), 5);
         assert_eq!(results[0].type_code, TypeCode::QueryEvent);
         assert_eq!(results[0].query, Some("CREATE TABLE foo(id BIGINT AUTO_INCREMENT PRIMARY KEY, val_decimal DECIMAL(10, 5) NOT NULL, comment VARCHAR(255) NOT NULL)".to_owned()));

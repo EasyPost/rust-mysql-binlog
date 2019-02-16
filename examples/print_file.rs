@@ -12,7 +12,7 @@ fn main() -> Result<(), failure::Error> {
     }
     let stdout = std::io::stdout();
     let mut stdout = stdout.lock();
-    for event in mysql_binlog::parse_file(&args[1])?.events() {
+    for event in mysql_binlog::parse_file(&args[1])? {
         if let Ok(event) = event {
             serde_json::to_writer_pretty(&mut stdout, &event).map_err(|e| Box::new(e))?;
             write!(stdout, "\n")?;
