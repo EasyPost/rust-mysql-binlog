@@ -174,6 +174,17 @@ pub enum RowEvent {
 }
 
 
+impl RowEvent {
+    pub fn cols(&self) -> Option<&RowData> {
+        match self {
+            RowEvent::NewRow { cols } => Some(cols),
+            RowEvent::DeletedRow { cols } => Some(cols),
+            RowEvent::UpdatedRow { .. } => None
+        }
+    }
+}
+
+
 fn parse_rows_event<R: Read+Seek>(type_code: TypeCode, data_len: usize, mut cursor: &mut R, table_map: Option<&TableMap>) -> Result<RowsEvent, Error> {
     let mut table_id_buf = [0u8; 8];
     cursor.read_exact(&mut table_id_buf[0..6])?;

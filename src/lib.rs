@@ -24,6 +24,8 @@ extern crate serde;
 #[macro_use] extern crate serde_derive;
 #[cfg_attr(test, macro_use)]
 extern crate serde_json;
+#[cfg(test)]
+#[macro_use] extern crate assert_matches;
 
 use std::fs::File;
 use std::io::{Read, Seek};
@@ -42,8 +44,6 @@ mod jsonb;
 
 use event::EventData;
 
-pub use event::TypeCode;
-
 
 #[derive(Debug, Clone, Copy)]
 /// Global Transaction ID
@@ -56,6 +56,12 @@ impl serde::Serialize for Gtid {
     {
         let serialized = format!("{}:{}", self.0.hyphenated(), self.1);
         serializer.serialize_str(&serialized)
+    }
+}
+
+impl ToString for Gtid {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.0.hyphenated(), self.1)
     }
 }
 
@@ -185,7 +191,7 @@ impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
     }
 
     /// Consume this builder, returning an iterator of [`BinlogEvent`] structs
-    pub fn events(self) -> EventIterator<BR> {
+    pub fn build(self) -> EventIterator<BR> {
         EventIterator::new(self.bf, self.start_position)
     }
 }
@@ -198,7 +204,7 @@ impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
 /// - returns an immediate error if the Read does not begin with a valid Format Descriptor Event
 /// - each call to the iterator can return an error if there is an I/O or parsing error
 pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<EventIterator<R>, failure::Error> {
-    BinlogFileParserBuilder::try_from_reader(r).map(|b| b.events())
+    BinlogFileParserBuilder::try_from_reader(r).map(|b| b.build())
 }
 
 
@@ -209,13 +215,17 @@ pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<EventIterator<R>, 
 /// - returns an immediate error if the file could not be opened or if it does not contain a valid Format Desciptor Event
 /// - each call to the iterator can return an error if there is an I/O or parsing error
 pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<EventIterator<File>, failure::Error> {
-    BinlogFileParserBuilder::try_from_path(file_name).map(|b| b.events())
+    BinlogFileParserBuilder::try_from_path(file_name).map(|b| b.build())
 }
 
 
 #[cfg(test)]
 mod tests{
-    use super::{parse_file, parse_reader, TypeCode};
+    use bigdecimal::BigDecimal;
+
+    use super::{parse_file, parse_reader};
+    use crate::event::TypeCode;
+    use crate::value::MySQLValue;
 
     #[test]
     fn test_parse_file() {
@@ -223,6 +233,17 @@ mod tests{
         assert_eq!(results.len(), 5);
         assert_eq!(results[0].type_code, TypeCode::QueryEvent);
         assert_eq!(results[0].query, Some("CREATE TABLE foo(id BIGINT AUTO_INCREMENT PRIMARY KEY, val_decimal DECIMAL(10, 5) NOT NULL, comment VARCHAR(255) NOT NULL)".to_owned()));
+        assert_eq!(results[2].timestamp, 1550192291);
+        assert_eq!(results[2].gtid.unwrap().to_string(), "87cee3a4-6b31-11e7-bdfd-0d98d6698870:14918");
+        assert_eq!(results[2].schema_name.as_ref().map(|s| s.as_str()), Some("bltest"));
+        assert_eq!(results[2].table_name.as_ref().map(|s| s.as_str()), Some("foo"));
+        let cols = results[2].rows[0].cols().unwrap();
+        assert_matches!(cols[0], Some(MySQLValue::SignedInteger(1)));
+        assert_matches!(cols[1], Some(MySQLValue::Decimal(_)));
+        if let Some(MySQLValue::Decimal(ref d)) = cols[1] {
+            assert_eq!(*d, "0.1".parse::<BigDecimal>().unwrap());
+        }
+        assert_matches!(cols[2], Some(MySQLValue::String(_)));
     }
 
     #[test]
