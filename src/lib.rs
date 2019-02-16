@@ -183,7 +183,7 @@ impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
 /// - returns an immediate error if the Read does not begin with a valid Format Descriptor Event
 /// - each call to the iterator can return an error if there is an I/O or parsing error
 pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<BinlogFileParserBuilder<R>, failure::Error> {
-    let bf = binlog_file::BinlogFile::from_reader(r)?;
+    let bf = binlog_file::BinlogFile::try_from_reader(r)?;
     Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
 }
 

@@ -75,7 +75,7 @@ impl BinlogFile<File> {
 
 impl<I: Seek+Read> BinlogFile<I> {
 
-    pub fn from_reader(reader: I) -> Result<Self, Error> {
+    pub fn try_from_reader(reader: I) -> Result<Self, Error> {
         Self::try_new_from_reader_name(reader, None)
     }
 
