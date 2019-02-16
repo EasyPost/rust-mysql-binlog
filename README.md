@@ -6,4 +6,4 @@
 
 Its primary purpose is handling row-based logging messages, but it has rudimentary support for older statement-based replication. It's been tested against Percona XtraDB (MySQL) 5.6 and 5.7.
 
-This library seeks be competitive with `mysqlbinlog` at parsing full logs, and is already several orders of magnitude faster than `go-mysql`, `python-mysql-replication`, or Ruby's `mysql_binlog`
+This library seeks to be competitive with `mysqlbinlog` at time-to-parse a full binlog file, and is already several orders of magnitude faster than `go-mysql`, `python-mysql-replication`, or Ruby's `mysql_binlog`. All interesting datatypes are serializable using Serde, so it's easy to hook into other data processing flows.
