@@ -61,7 +61,7 @@ impl serde::Serialize for Gtid {
 
 
 #[derive(Debug, Serialize)]
-/// A binlog event as returned by EventIterator
+/// A binlog event as returned by [`EventIterator`]
 pub struct BinlogEvent {
     pub type_code: event::TypeCode,
     // warning: Y2038 Problem ahead
@@ -78,7 +78,7 @@ pub struct BinlogEvent {
 }
 
 
-/// Iterator over BinlogEvents
+/// Iterator over [`BinlogEvent`]s
 pub struct EventIterator<BR: Read+Seek> {
     events: binlog_file::BinlogEvents<BR>,
     table_map: table_map::TableMap,
@@ -169,7 +169,7 @@ impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
         self
     }
 
-    /// Consume this builder, returning an iterator of BinlogEvent structs
+    /// Consume this builder, returning an iterator of [`BinlogEvent`] structs
     pub fn events(self) -> EventIterator<BR> {
         EventIterator::new(self.bf, self.start_position)
     }
