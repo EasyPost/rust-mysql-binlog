@@ -61,7 +61,8 @@ impl serde::Serialize for Gtid {
 
 
 #[derive(Debug, Serialize)]
-/// A binlog event as returned by [`EventIterator`]
+/// A binlog event as returned by [`EventIterator`]. Filters out internal events
+/// like the TableMapEvent and simplifies mapping GTIDs to individual events.
 pub struct BinlogEvent {
     pub type_code: event::TypeCode,
     // warning: Y2038 Problem ahead
