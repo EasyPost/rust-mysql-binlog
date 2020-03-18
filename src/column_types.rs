@@ -31,7 +31,7 @@ pub enum ColumnType {
     Bit(u8, u8),
     NewDecimal(u8, u8),
     Enum(u16),
-    Set,
+    Set(u16),
     TinyBlob,
     MediumBlob,
     LongBlob,
@@ -68,7 +68,8 @@ impl ColumnType {
             245 => ColumnType::Json(0), // need to implement JsonB
             246 => ColumnType::NewDecimal(0, 0),
             247 => ColumnType::Enum(0),
-            248 => ColumnType::TinyBlob,   // docs say this can't occur
+            248 => ColumnType::Set(0),
+            249 => ColumnType::TinyBlob,   // docs say this can't occur
             250 => ColumnType::MediumBlob, // docs say this can't occur
             251 => ColumnType::LongBlob,   // docs say this can't occur
             252 => ColumnType::Blob(0),
@@ -97,7 +98,7 @@ impl ColumnType {
                 let pack_length = cursor.read_u8()?;
                 ColumnType::Geometry(pack_length)
             }
-            ColumnType::VarChar(_) => {
+            ColumnType::VarString | ColumnType::VarChar(_) => {
                 let max_length = cursor.read_u16::<LittleEndian>()?;
                 assert!(max_length != 0);
                 ColumnType::VarChar(max_length)
@@ -108,15 +109,33 @@ impl ColumnType {
                 let num_decimals = cursor.read_u8()?;
                 ColumnType::NewDecimal(precision, num_decimals)
             }
-            ColumnType::VarString | ColumnType::MyString => {
+            ColumnType::MyString => {
+                // In Table_map_event, column type MYSQL_TYPE_STRING
+                // can have the following real_type:
+                // * MYSQL_TYPE_STRING (used for CHAR(n) and BINARY(n) SQL types with n <=255)
+                // * MYSQL_TYPE_ENUM
+                // * MYSQL_TYPE_SET
                 let f1 = cursor.read_u8()?;
                 let f2 = cursor.read_u8()?;
-                let real_type = f1;
-                let real_type = ColumnType::from_byte(real_type);
-                let real_size: u16 = f2.into();
-                // XXX todo this actually includes some of the bits from f1
+                let (real_type, max_length) = if f1 == 0 {
+                    // not sure which version of mysql emits this,
+                    // but log_event.cc checks this case
+                    (ColumnType::MyString, f2 as u16)
+                } else {
+                    // The max length is in 0-1023,
+                    // (since CHAR(255) CHARACTER SET utf8mb4 turns into max_length=1020)
+                    // and the upper 4 bits of real_type are always set
+                    // (in real_type = MYSQL_TYPE_ENUM, MYSQL_TYPE_SET, MYSQL_TYPE_STRING)
+                    // So MySQL packs the upper bits of the length
+                    // in the 0x30 bits of the type, inverted
+                    let real_type = f1 | 0x30;
+                    let max_length = (!f1 as u16) << 4 & 0x300 | f2 as u16;
+                    (ColumnType::from_byte(real_type), max_length)
+                };
                 match real_type {
-                    ColumnType::Enum(_) => ColumnType::Enum(real_size),
+                    ColumnType::MyString => ColumnType::VarChar(max_length),
+                    ColumnType::Set(_) => ColumnType::Set(max_length),
+                    ColumnType::Enum(_) => ColumnType::Enum(max_length),
                     i => unimplemented!("unimplemented stringy type {:?}", i),
                 }
             }
@@ -152,6 +171,10 @@ impl ColumnType {
             }
             &ColumnType::Null => Ok(MySQLValue::Null),
             &ColumnType::VarChar(max_len) => {
+                // TODO: don't decode to String,
+                // since type=real_type=MYSQL_TYPE_STRING is used for BINARY(n)
+                // and type=MYSQL_TYPE_VARCHAR is used for VARBINARY(n)
+                // and also the CHAR(n) and VARCHAR(n) encoding is not always utf-8
                 let value = if max_len > 255 {
                     read_two_byte_length_prefixed_string(r)?
                 } else {
@@ -317,7 +340,7 @@ impl ColumnType {
             &ColumnType::Decimal
             | &ColumnType::NewDate
             | &ColumnType::Bit(..)
-            | &ColumnType::Set
+            | &ColumnType::Set(..)
             | &ColumnType::Geometry(..) => {
                 unimplemented!("unhandled value type: {:?}", self);
             }
