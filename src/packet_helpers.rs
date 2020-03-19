@@ -73,11 +73,11 @@ pub(crate) fn read_two_byte_length_prefixed_bytes<R: Read>(r: &mut R) -> io::Res
 
 pub(crate) fn read_var_byte_length_prefixed_bytes<R: Read>(r: &mut R, pl: u8) -> io::Result<Vec<u8>> {
     let len = match pl {
-        1 => r.read_u8()? as usize,
-        2 => r.read_i16::<LittleEndian>()? as usize,
-        4 => r.read_u32::<LittleEndian>()? as usize,
-        8 => r.read_u64::<LittleEndian>()? as usize,
-        _ => unreachable!()
+        1 => r.read_u8()? as usize,  // tinytext, tinyblob
+        2 => r.read_u16::<LittleEndian>()? as usize,  // text, blob
+        3 => r.read_u24::<LittleEndian>()? as usize,  // mediumtext, mediumblob
+        4 => r.read_u32::<LittleEndian>()? as usize,  // longtext, longblob, json
+        i => unreachable!("Unexpected read_var_byte_length_prefixed_bytes {}", i)
     };
     read_nbytes(r, len)
 }
