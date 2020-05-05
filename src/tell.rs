@@ -1,5 +1,4 @@
-use std::io::{Seek,SeekFrom,Result};
-
+use std::io::{Result, Seek, SeekFrom};
 
 pub trait Tell: Seek {
     fn tell(&mut self) -> Result<u64> {
@@ -7,4 +6,4 @@ pub trait Tell: Seek {
     }
 }
 
-impl<T> Tell for T where T: Seek { }
+impl<T> Tell for T where T: Seek {}

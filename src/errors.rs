@@ -2,9 +2,9 @@ use crate::column_types;
 
 #[derive(Debug, Fail)]
 pub enum EventParseError {
-    #[fail(display="column parse error")]
+    #[fail(display = "column parse error")]
     ColumnParseError(ColumnParseError),
-    #[fail(display="unexpected EOF")]
+    #[fail(display = "unexpected EOF")]
     EofError,
 }
 
@@ -16,11 +16,11 @@ impl From<ColumnParseError> for EventParseError {
 
 #[derive(Debug, Fail)]
 pub enum JsonbParseError {
-    #[fail(display="invalid type byte")]
+    #[fail(display = "invalid type byte")]
     InvalidTypeByte(u8),
-    #[fail(display="invalid type literal byte")]
+    #[fail(display = "invalid type literal byte")]
     InvalidLiteral(u16),
-    #[fail(display="error parsing opaque column in json record: {:?}", inner)]
+    #[fail(display = "error parsing opaque column in json record: {:?}", inner)]
     OpaqueColumnParseError { inner: Box<ColumnParseError> },
 }
 
@@ -30,13 +30,14 @@ impl From<ColumnParseError> for JsonbParseError {
     }
 }
 
-
 #[derive(Debug, Fail)]
 pub enum ColumnParseError {
-    #[fail(display="unimplemented column type: {:?}", column_type)]
-    UnimplementedTypeError { column_type: column_types::ColumnType },
-    #[fail(display="error parsing JSON column")]
-    JsonError(JsonbParseError)
+    #[fail(display = "unimplemented column type: {:?}", column_type)]
+    UnimplementedTypeError {
+        column_type: column_types::ColumnType,
+    },
+    #[fail(display = "error parsing JSON column")]
+    JsonError(JsonbParseError),
 }
 
 impl From<JsonbParseError> for ColumnParseError {
@@ -45,17 +46,15 @@ impl From<JsonbParseError> for ColumnParseError {
     }
 }
 
-
 #[derive(Debug, Fail)]
 pub enum BinlogParseError {
-    #[fail(display="error parsing event")]
+    #[fail(display = "error parsing event")]
     EventParseError(EventParseError),
-    #[fail(display="bad magic value at start of binlog")]
-    BadMagic([u8;4]),
-    #[fail(display="bad first record in binlog")]
+    #[fail(display = "bad magic value at start of binlog")]
+    BadMagic([u8; 4]),
+    #[fail(display = "bad first record in binlog")]
     BadFirstRecord,
 }
-
 
 impl From<EventParseError> for BinlogParseError {
     fn from(e: EventParseError) -> Self {

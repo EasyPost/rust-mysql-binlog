@@ -16,43 +16,45 @@
 //!     }
 //! }
 //! ```
+extern crate base64;
 extern crate byteorder;
 extern crate uuid;
-extern crate base64;
-#[macro_use] extern crate failure;
+#[macro_use]
+extern crate failure;
 extern crate serde;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde_derive;
 #[cfg_attr(test, macro_use)]
 extern crate serde_json;
 #[cfg(test)]
-#[macro_use] extern crate assert_matches;
+#[macro_use]
+extern crate assert_matches;
 
 use std::fs::File;
 use std::io::{Read, Seek};
 use std::path::Path;
 
 pub mod binlog_file;
-pub mod errors;
-pub mod event;
 mod bit_set;
 pub mod column_types;
-pub mod value;
-pub mod table_map;
-mod packet_helpers;
-mod tell;
+pub mod errors;
+pub mod event;
 mod jsonb;
+mod packet_helpers;
+pub mod table_map;
+mod tell;
+pub mod value;
 
 use event::EventData;
-
 
 #[derive(Debug, Clone, Copy)]
 /// Global Transaction ID
 pub struct Gtid(uuid::Uuid, u64);
 
-
 impl serde::Serialize for Gtid {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: serde::Serializer
+    where
+        S: serde::Serializer,
     {
         let serialized = format!("{}:{}", self.0.hyphenated(), self.1);
         serializer.serialize_str(&serialized)
@@ -64,7 +66,6 @@ impl ToString for Gtid {
         format!("{}:{}", self.0.hyphenated(), self.1)
     }
 }
-
 
 #[derive(Debug, Serialize)]
 /// A binlog event as returned by [`EventIterator`]. Filters out internal events
@@ -84,15 +85,14 @@ pub struct BinlogEvent {
     pub query: Option<String>,
 }
 
-
 /// Iterator over [`BinlogEvent`]s
-pub struct EventIterator<BR: Read+Seek> {
+pub struct EventIterator<BR: Read + Seek> {
     events: binlog_file::BinlogEvents<BR>,
     table_map: table_map::TableMap,
     current_gtid: Option<Gtid>,
 }
 
-impl<BR: Read+Seek> EventIterator<BR> {
+impl<BR: Read + Seek> EventIterator<BR> {
     fn new(bf: binlog_file::BinlogFile<BR>, start_offset: Option<u64>) -> Self {
         EventIterator {
             events: bf.events(start_offset),
@@ -102,67 +102,75 @@ impl<BR: Read+Seek> EventIterator<BR> {
     }
 }
 
-impl<BR: Read+Seek> Iterator for EventIterator<BR> {
+impl<BR: Read + Seek> Iterator for EventIterator<BR> {
     type Item = Result<BinlogEvent, failure::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(event) = self.events.next() {
             let event = match event {
                 Ok(event) => event,
-                Err(e) => return Some(Err(e))
+                Err(e) => return Some(Err(e)),
             };
             match event.inner(Some(&self.table_map)) {
-                Ok(Some(e)) => {
-                    match e {
-                        EventData::GtidLogEvent { uuid, coordinate, .. } => {
-                            self.current_gtid = Some(Gtid(uuid, coordinate));
-                        },
-                        EventData::TableMapEvent { table_id, schema_name, table_name, columns, .. } => {
-                            self.table_map.handle(table_id, schema_name, table_name, columns);
-                        },
-                        EventData::QueryEvent { query, .. } => {
-                            return Some(Ok(BinlogEvent {
-                                type_code: event.type_code(),
-                                timestamp: event.timestamp(),
-                                gtid: self.current_gtid,
-                                table_name: None,
-                                schema_name: None,
-                                rows: Vec::new(),
-                                query: Some(query)
-                            }))
-                        },
-                        EventData::WriteRowsEvent { table_id, rows } | EventData::UpdateRowsEvent { table_id, rows } | EventData::DeleteRowsEvent { table_id, rows } => {
-                            let maybe_table = self.table_map.get(table_id);
-                            let message = BinlogEvent {
-                                type_code: event.type_code(),
-                                timestamp: event.timestamp(),
-                                gtid: self.current_gtid,
-                                table_name: maybe_table.as_ref().map(|a| a.table_name.to_owned()),
-                                schema_name: maybe_table.as_ref().map(|a| a.schema_name.to_owned()),
-                                rows,
-                                query: None,
-                            };
-                            return Some(Ok(message))
-                        },
-                        u => {
-                            eprintln!("unhandled event: {:?}", u);
-                        }
+                Ok(Some(e)) => match e {
+                    EventData::GtidLogEvent {
+                        uuid, coordinate, ..
+                    } => {
+                        self.current_gtid = Some(Gtid(uuid, coordinate));
+                    }
+                    EventData::TableMapEvent {
+                        table_id,
+                        schema_name,
+                        table_name,
+                        columns,
+                        ..
+                    } => {
+                        self.table_map
+                            .handle(table_id, schema_name, table_name, columns);
+                    }
+                    EventData::QueryEvent { query, .. } => {
+                        return Some(Ok(BinlogEvent {
+                            type_code: event.type_code(),
+                            timestamp: event.timestamp(),
+                            gtid: self.current_gtid,
+                            table_name: None,
+                            schema_name: None,
+                            rows: Vec::new(),
+                            query: Some(query),
+                        }))
+                    }
+                    EventData::WriteRowsEvent { table_id, rows }
+                    | EventData::UpdateRowsEvent { table_id, rows }
+                    | EventData::DeleteRowsEvent { table_id, rows } => {
+                        let maybe_table = self.table_map.get(table_id);
+                        let message = BinlogEvent {
+                            type_code: event.type_code(),
+                            timestamp: event.timestamp(),
+                            gtid: self.current_gtid,
+                            table_name: maybe_table.as_ref().map(|a| a.table_name.to_owned()),
+                            schema_name: maybe_table.as_ref().map(|a| a.schema_name.to_owned()),
+                            rows,
+                            query: None,
+                        };
+                        return Some(Ok(message));
+                    }
+                    u => {
+                        eprintln!("unhandled event: {:?}", u);
                     }
                 },
                 Ok(None) => {
                     // this event doesn't have an inner type, which means we don't currently
                     // care about it. Example: PreviousGtidEvent
-                },
-                Err(e) => return Some(Err(e))
+                }
+                Err(e) => return Some(Err(e)),
             }
         }
         None
     }
 }
 
-
 /// Builder to configure Binary Log reading
-pub struct BinlogFileParserBuilder<BR: Read+Seek> {
+pub struct BinlogFileParserBuilder<BR: Read + Seek> {
     bf: binlog_file::BinlogFile<BR>,
     start_position: Option<u64>,
 }
@@ -171,15 +179,21 @@ impl BinlogFileParserBuilder<File> {
     /// Construct a new BinlogFileParserBuilder from some path
     pub fn try_from_path<P: AsRef<Path>>(file_name: P) -> Result<Self, failure::Error> {
         let bf = binlog_file::BinlogFile::try_from_path(file_name.as_ref())?;
-        Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
+        Ok(BinlogFileParserBuilder {
+            bf: bf,
+            start_position: None,
+        })
     }
 }
 
-impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
+impl<BR: Read + Seek> BinlogFileParserBuilder<BR> {
     /// Construct a new BinlogFileParserBuilder from some object implementing Read and Seek
     pub fn try_from_reader(r: BR) -> Result<Self, failure::Error> {
         let bf = binlog_file::BinlogFile::try_from_reader(r)?;
-        Ok(BinlogFileParserBuilder { bf: bf, start_position: None })
+        Ok(BinlogFileParserBuilder {
+            bf: bf,
+            start_position: None,
+        })
     }
 
     /// Set the start position to begin emitting events. NOTE: The beginning of the binlog will
@@ -196,7 +210,6 @@ impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
     }
 }
 
-
 /// Parse events from an object implementing the [`std::io::Read`] trait
 ///
 /// ## Errors
@@ -206,7 +219,6 @@ impl<BR: Read+Seek> BinlogFileParserBuilder<BR> {
 pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<EventIterator<R>, failure::Error> {
     BinlogFileParserBuilder::try_from_reader(r).map(|b| b.build())
 }
-
 
 /// parse all events in the file living at a given path
 ///
@@ -218,9 +230,8 @@ pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<EventIterator<File>, f
     BinlogFileParserBuilder::try_from_path(file_name).map(|b| b.build())
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
     use bigdecimal::BigDecimal;
 
     use super::{parse_file, parse_reader};
@@ -229,14 +240,26 @@ mod tests{
 
     #[test]
     fn test_parse_file() {
-        let results = parse_file("test_data/bin-log.000001").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+        let results = parse_file("test_data/bin-log.000001")
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         assert_eq!(results.len(), 5);
         assert_eq!(results[0].type_code, TypeCode::QueryEvent);
         assert_eq!(results[0].query, Some("CREATE TABLE foo(id BIGINT AUTO_INCREMENT PRIMARY KEY, val_decimal DECIMAL(10, 5) NOT NULL, comment VARCHAR(255) NOT NULL)".to_owned()));
         assert_eq!(results[2].timestamp, 1550192291);
-        assert_eq!(results[2].gtid.unwrap().to_string(), "87cee3a4-6b31-11e7-bdfd-0d98d6698870:14918");
-        assert_eq!(results[2].schema_name.as_ref().map(|s| s.as_str()), Some("bltest"));
-        assert_eq!(results[2].table_name.as_ref().map(|s| s.as_str()), Some("foo"));
+        assert_eq!(
+            results[2].gtid.unwrap().to_string(),
+            "87cee3a4-6b31-11e7-bdfd-0d98d6698870:14918"
+        );
+        assert_eq!(
+            results[2].schema_name.as_ref().map(|s| s.as_str()),
+            Some("bltest")
+        );
+        assert_eq!(
+            results[2].table_name.as_ref().map(|s| s.as_str()),
+            Some("foo")
+        );
         let cols = results[2].rows[0].cols().unwrap();
         assert_matches!(cols[0], Some(MySQLValue::SignedInteger(1)));
         assert_matches!(cols[1], Some(MySQLValue::Decimal(_)));
@@ -249,7 +272,10 @@ mod tests{
     #[test]
     fn test_parse_reader() {
         let f = std::fs::File::open("test_data/bin-log.000001").unwrap();
-        let results = parse_reader(f).unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+        let results = parse_reader(f)
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         assert_eq!(results.len(), 5);
         assert_eq!(results[0].type_code, TypeCode::QueryEvent);
         assert_eq!(results[0].query, Some("CREATE TABLE foo(id BIGINT AUTO_INCREMENT PRIMARY KEY, val_decimal DECIMAL(10, 5) NOT NULL, comment VARCHAR(255) NOT NULL)".to_owned()));

@@ -1,6 +1,5 @@
-use std::fmt;
 use std::error::Error;
-
+use std::fmt;
 
 /// A simple set implemented by using a bit-mask stored in sequential bytes (no word-level
 /// packing is done to maintain compatibility with MySQL's).
@@ -16,7 +15,6 @@ impl fmt::Debug for BitSet {
         write!(f, "BitSet {{ num_elems: {} }}", self.num_elems)
     }
 }
-
 
 #[derive(Debug)]
 pub enum BitSetError {
@@ -36,14 +34,12 @@ impl Error for BitSetError {
     }
 }
 
-
-
 impl BitSet {
     pub fn new(num_elems: usize) -> Self {
         let vec_len = (num_elems + 7) >> 3;
         BitSet {
             num_elems,
-            inner: vec![0u8 ; vec_len]
+            inner: vec![0u8; vec_len],
         }
     }
 
@@ -54,13 +50,16 @@ impl BitSet {
         }
         Ok(BitSet {
             num_elems,
-            inner: slice[0..vec_len].to_owned()
+            inner: slice[0..vec_len].to_owned(),
         })
     }
 
     fn get_byte_offset(&self, item: usize) -> usize {
         if item >= self.num_elems {
-            panic!("attempted to index bit_set out of range: {} >= {}", item, self.num_elems);
+            panic!(
+                "attempted to index bit_set out of range: {} >= {}",
+                item, self.num_elems
+            );
         }
         item >> 3
     }
@@ -100,7 +99,6 @@ impl BitSet {
         self.inner.iter().map(|c| c.count_ones() as usize).sum()
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -1,7 +1,7 @@
-use std::io::{self,Read,Cursor};
+use std::io::{self, Cursor, Read};
 
 use bigdecimal::BigDecimal;
-use byteorder::{ByteOrder,ReadBytesExt,LittleEndian,BigEndian};
+use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
 
 // This module contains miscellaneous shitty functions for reading various
 // MySQL data types out of a packet (or, well, a Read).
@@ -42,7 +42,7 @@ pub(crate) fn read_known_length_integer_be<R: Read>(r: &mut R, bytes: usize) -> 
             } else {
                 num
             }
-        },
+        }
         4 => i64::from(r.read_i32::<BigEndian>()?),
         _ => unimplemented!(),
     })
@@ -53,7 +53,6 @@ pub(crate) fn read_uint24<R: Read>(r: &mut R) -> io::Result<u32> {
     r.read_exact(&mut buf[0..3])?;
     Ok(LittleEndian::read_u32(&buf))
 }
-
 
 pub(crate) fn read_int24<R: Read>(r: &mut R) -> io::Result<i32> {
     let mut buf = [0u8; 4];
@@ -71,30 +70,34 @@ pub(crate) fn read_two_byte_length_prefixed_bytes<R: Read>(r: &mut R) -> io::Res
     read_nbytes(r, length)
 }
 
-pub(crate) fn read_var_byte_length_prefixed_bytes<R: Read>(r: &mut R, pl: u8) -> io::Result<Vec<u8>> {
+pub(crate) fn read_var_byte_length_prefixed_bytes<R: Read>(
+    r: &mut R,
+    pl: u8,
+) -> io::Result<Vec<u8>> {
     let len = match pl {
         1 => r.read_u8()? as usize,
         2 => r.read_i16::<LittleEndian>()? as usize,
         4 => r.read_u32::<LittleEndian>()? as usize,
         8 => r.read_u64::<LittleEndian>()? as usize,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
     read_nbytes(r, len)
 }
-
 
 pub(crate) fn read_one_byte_length_prefixed_string<R: Read>(r: &mut R) -> io::Result<String> {
     let buf = read_one_byte_length_prefixed_bytes(r)?;
     Ok(String::from_utf8_lossy(&buf).into_owned())
 }
 
-
 pub(crate) fn read_two_byte_length_prefixed_string<R: Read>(r: &mut R) -> io::Result<String> {
     let buf = read_two_byte_length_prefixed_bytes(r)?;
     Ok(String::from_utf8_lossy(&buf).into_owned())
 }
 
-pub(crate) fn read_nbytes<R: Read, S: Into<usize>>(r: &mut R, desired_bytes: S) -> io::Result<Vec<u8>> {
+pub(crate) fn read_nbytes<R: Read, S: Into<usize>>(
+    r: &mut R,
+    desired_bytes: S,
+) -> io::Result<Vec<u8>> {
     let mut into = vec![0u8; desired_bytes.into()];
     r.read_exact(&mut into)?;
     Ok(into)
@@ -122,7 +125,11 @@ pub(crate) fn read_variable_length_string<R: Read>(r: &mut R) -> io::Result<Stri
 
 const DECIMAL_DIGITS_PER_INTEGER: u8 = 9;
 
-pub(crate) fn read_new_decimal<R: Read>(r: &mut R, precision: u8, decimal: u8) -> Result<BigDecimal, failure::Error> {
+pub(crate) fn read_new_decimal<R: Read>(
+    r: &mut R,
+    precision: u8,
+    decimal: u8,
+) -> Result<BigDecimal, failure::Error> {
     // like every other binlog parser's implementation, this code
     // is a transliteration of https://github.com/jeremycole/mysql_binlog/blob/master/lib/mysql_binlog/binlog_field_parser.rb#L233
     // because this format is bananas
@@ -130,10 +137,15 @@ pub(crate) fn read_new_decimal<R: Read>(r: &mut R, precision: u8, decimal: u8) -
     let integral = precision - decimal;
     let uncompressed_integers: usize = (integral / DECIMAL_DIGITS_PER_INTEGER).into();
     let uncompressed_decimals: usize = (decimal / DECIMAL_DIGITS_PER_INTEGER).into();
-    let compressed_integers: usize = integral as usize - (uncompressed_integers * DECIMAL_DIGITS_PER_INTEGER as usize);
-    let compressed_decimals: usize = decimal as usize - (uncompressed_decimals * DECIMAL_DIGITS_PER_INTEGER as usize);
+    let compressed_integers: usize =
+        integral as usize - (uncompressed_integers * DECIMAL_DIGITS_PER_INTEGER as usize);
+    let compressed_decimals: usize =
+        decimal as usize - (uncompressed_decimals * DECIMAL_DIGITS_PER_INTEGER as usize);
 
-    let bytes_to_read: usize = uncompressed_integers * 4 + compressed_byte_map[compressed_integers] + uncompressed_decimals * 4 + compressed_byte_map[compressed_decimals];
+    let bytes_to_read: usize = uncompressed_integers * 4
+        + compressed_byte_map[compressed_integers]
+        + uncompressed_decimals * 4
+        + compressed_byte_map[compressed_decimals];
 
     let mut buf = read_nbytes(r, bytes_to_read)?;
 
@@ -158,11 +170,16 @@ pub(crate) fn read_new_decimal<R: Read>(r: &mut R, precision: u8, decimal: u8) -
         components.push(format!("{:09}", r.read_u32::<LittleEndian>()?));
     }
     if compressed_decimals != 0 {
-        components.push(read_known_length_integer_be(&mut r, compressed_byte_map[compressed_decimals])?.to_string())
+        components.push(
+            read_known_length_integer_be(&mut r, compressed_byte_map[compressed_decimals])?
+                .to_string(),
+        )
     }
-    components.join("").parse::<BigDecimal>().map_err(|e| failure::Error::from_boxed_compat(Box::new(e)))
+    components
+        .join("")
+        .parse::<BigDecimal>()
+        .map_err(|e| failure::Error::from_boxed_compat(Box::new(e)))
 }
-
 
 pub(crate) fn read_datetime_subsecond_part<R: Read>(r: &mut R, pack_length: u8) -> io::Result<u32> {
     Ok(match pack_length {
@@ -173,7 +190,6 @@ pub(crate) fn read_datetime_subsecond_part<R: Read>(r: &mut R, pack_length: u8) 
         _ => 0u32,
     })
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -187,12 +203,21 @@ mod tests {
     fn test_read_new_decimal() {
         let mut uut = Cursor::new(vec![0x80, 0x00, 0x00, 0x00, 0x01]);
         let one = "1.00".parse::<BigDecimal>().unwrap();
-        assert_eq!(read_new_decimal(&mut uut, 10, 0).expect("should parse"), one);
+        assert_eq!(
+            read_new_decimal(&mut uut, 10, 0).expect("should parse"),
+            one
+        );
         let mut uut = Cursor::new(vec![0x80, 0x00, 0x01, 0x00, 0x00]);
         let zero_point_one = "0.100".parse::<BigDecimal>().unwrap();
-        assert_eq!(read_new_decimal(&mut uut, 5, 5).expect("should parse"), zero_point_one);
+        assert_eq!(
+            read_new_decimal(&mut uut, 5, 5).expect("should parse"),
+            zero_point_one
+        );
         let mut uut = Cursor::new(vec![128, 0, 5, 0, 212, 49]);
         let expected = "5.54321".parse::<BigDecimal>().unwrap();
-        assert_eq!(read_new_decimal(&mut uut, 10, 5).expect("should parse"), expected);
+        assert_eq!(
+            read_new_decimal(&mut uut, 10, 5).expect("should parse"),
+            expected
+        );
     }
 }

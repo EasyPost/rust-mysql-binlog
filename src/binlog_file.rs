@@ -1,12 +1,11 @@
-use std::path::{PathBuf,Path};
 use std::fs::File;
-use std::io::{self,Read, Seek};
+use std::io::{self, Read, Seek};
+use std::path::{Path, PathBuf};
 
 use failure::Error;
 
-use crate::event::{Event,TypeCode};
-use crate::errors::{BinlogParseError,EventParseError};
-
+use crate::errors::{BinlogParseError, EventParseError};
+use crate::event::{Event, TypeCode};
 
 /// Low level wrapper around a single Binlog file. Use this if you
 /// want to introspect all events (including internal events like the FDE
@@ -17,7 +16,6 @@ pub struct BinlogFile<I: Seek + Read> {
     first_event_offset: u64,
 }
 
-
 pub struct BinlogEvents<I: Seek + Read> {
     file: BinlogFile<I>,
     // if the offset is None, it means that we can't read any more
@@ -25,7 +23,7 @@ pub struct BinlogEvents<I: Seek + Read> {
     offset: Option<u64>,
 }
 
-impl<I: Seek+Read> BinlogEvents< I> {
+impl<I: Seek + Read> BinlogEvents<I> {
     pub fn new(mut bf: BinlogFile<I>, start_offset: u64) -> Self {
         bf.file.seek(io::SeekFrom::Start(start_offset)).unwrap();
         BinlogEvents {
@@ -35,7 +33,7 @@ impl<I: Seek+Read> BinlogEvents< I> {
     }
 }
 
-impl<I: Seek+Read> Iterator for BinlogEvents<I> {
+impl<I: Seek + Read> Iterator for BinlogEvents<I> {
     type Item = Result<Event, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -44,12 +42,12 @@ impl<I: Seek+Read> Iterator for BinlogEvents<I> {
                 Ok(e) => e,
                 Err(e) => {
                     if let Some(_e) = e.downcast_ref::<EventParseError>() {
-                        return None
+                        return None;
                     }
-                    return Some(Err(e))
+                    return Some(Err(e));
                 }
             },
-            None => return None
+            None => return None,
         };
         if event.type_code() == TypeCode::RotateEvent {
             self.offset = None;
@@ -59,7 +57,6 @@ impl<I: Seek+Read> Iterator for BinlogEvents<I> {
         Some(Ok(event))
     }
 }
-
 
 impl BinlogFile<File> {
     /// Construct a new BinLogFile from the given path
@@ -72,9 +69,7 @@ impl BinlogFile<File> {
     }
 }
 
-
-impl<I: Seek+Read> BinlogFile<I> {
-
+impl<I: Seek + Read> BinlogFile<I> {
     pub fn try_from_reader(reader: I) -> Result<Self, Error> {
         Self::try_new_from_reader_name(reader, None)
     }
@@ -84,7 +79,7 @@ impl<I: Seek+Read> BinlogFile<I> {
         let mut magic = [0u8; 4];
         fh.read_exact(&mut magic)?;
         if magic != [0xfeu8, 0x62, 0x69, 0x6e] {
-            return Err(BinlogParseError::BadMagic(magic).into())
+            return Err(BinlogParseError::BadMagic(magic).into());
         }
         let fde = Event::read(&mut fh, 4)?;
         if fde.inner(None)?.is_some() {
@@ -95,7 +90,7 @@ impl<I: Seek+Read> BinlogFile<I> {
         Ok(BinlogFile {
             file_name: name,
             file: fh,
-            first_event_offset: fde.next_position()
+            first_event_offset: fde.next_position(),
         })
     }
 
