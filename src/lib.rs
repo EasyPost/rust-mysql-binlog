@@ -56,14 +56,14 @@ impl serde::Serialize for Gtid {
     where
         S: serde::Serializer,
     {
-        let serialized = format!("{}:{}", self.0.hyphenated(), self.1);
+        let serialized = format!("{}:{}", self.0.to_hyphenated(), self.1);
         serializer.serialize_str(&serialized)
     }
 }
 
 impl ToString for Gtid {
     fn to_string(&self) -> String {
-        format!("{}:{}", self.0.hyphenated(), self.1)
+        format!("{}:{}", self.0.to_hyphenated(), self.1)
     }
 }
 

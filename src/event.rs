@@ -344,7 +344,7 @@ impl EventData {
                 let flags = cursor.read_u8()?;
                 let mut uuid_buf = [0u8; 16];
                 cursor.read_exact(&mut uuid_buf)?;
-                let uuid = Uuid::from_bytes(&uuid_buf)?;
+                let uuid = Uuid::from_slice(&uuid_buf)?;
                 let offset = cursor.read_u64::<LittleEndian>()?;
                 let (last_committed, sequence_number) = match cursor.read_u8() {
                     Ok(0x02) => {
