@@ -124,6 +124,8 @@ pub enum EventData {
         flags: u8,
         uuid: Uuid,
         coordinate: u64,
+        last_committed: Option<u64>,
+        sequence_number: Option<u64>,
     },
     QueryEvent {
         thread_id: u32,
@@ -344,10 +346,20 @@ impl EventData {
                 cursor.read_exact(&mut uuid_buf)?;
                 let uuid = Uuid::from_bytes(&uuid_buf)?;
                 let offset = cursor.read_u64::<LittleEndian>()?;
+                let (last_committed, sequence_number) = match cursor.read_u8() {
+                    Ok(0x02) => {
+                        let last_committed = cursor.read_u64::<LittleEndian>()?;
+                        let sequence_number = cursor.read_u64::<LittleEndian>()?;
+                        (Some(last_committed), Some(sequence_number))
+                    }
+                    _ => (None, None),
+                };
                 Ok(Some(EventData::GtidLogEvent {
                     flags,
                     uuid,
                     coordinate: offset,
+                    last_committed,
+                    sequence_number,
                 }))
             }
             TypeCode::QueryEvent => {
@@ -519,5 +531,9 @@ impl Event {
 
     pub fn event_length(&self) -> u32 {
         self.event_length
+    }
+
+    pub fn offset(&self) -> u64 {
+        self.offset
     }
 }
