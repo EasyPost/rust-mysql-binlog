@@ -3,28 +3,31 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum EventParseError {
-    #[error("unable to parse column")]
+    #[error("unable to parse column: {0:?}")]
     ColumnParseError(#[from] ColumnParseError),
-    #[error("I/O error reading column")]
+    #[error("I/O error reading column: {0:?}")]
     Io(#[from] ::std::io::Error),
     #[error("unexpected EOF")]
     EofError,
-    #[error("bad UUID in Gtid Event")]
+    #[error("bad UUID in Gtid Event: {0:?}")]
     Uuid(#[from] uuid::Error),
 }
 
 #[derive(Debug, Error)]
 pub enum JsonbParseError {
-    #[error("invalid type byte")]
+    #[error("invalid type byte (got {0})")]
     InvalidTypeByte(u8),
-    #[error("invalid type literal byte")]
+    #[error("invalid type literal (got {0})")]
     InvalidLiteral(u16),
-    #[error("I/O error reading JSONB value")]
+    #[error("I/O error reading JSONB value: {0:?}")]
     Io(#[from] ::std::io::Error),
     #[error("invalid JSON")]
     Json(#[from] serde_json::error::Error),
     #[error("error parsing opaque column in json record: {inner:?}")]
-    OpaqueColumnParseError { inner: Box<ColumnParseError> },
+    OpaqueColumnParseError {
+        #[source]
+        inner: Box<ColumnParseError>,
+    },
 }
 
 impl From<ColumnParseError> for JsonbParseError {
@@ -51,7 +54,7 @@ pub enum ColumnParseError {
 pub enum BinlogParseError {
     #[error("error parsing event")]
     EventParseError(#[from] EventParseError),
-    #[error("bad magic value at start of binlog")]
+    #[error("bad magic value at start of binlog: got {0:?}")]
     BadMagic([u8; 4]),
     #[error("bad first record in binlog")]
     BadFirstRecord,
