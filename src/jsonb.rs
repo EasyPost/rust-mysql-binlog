@@ -6,7 +6,6 @@ use std::iter::FromIterator;
 
 use base64;
 use byteorder::{LittleEndian, ReadBytesExt};
-use failure::Error;
 use serde_json::map::Map as JsonMap;
 use serde_json::Value as JsonValue;
 
@@ -65,7 +64,7 @@ enum CompoundType {
     Array,
 }
 
-pub fn parse(blob: Vec<u8>) -> Result<JsonValue, Error> {
+pub fn parse(blob: Vec<u8>) -> Result<JsonValue, JsonbParseError> {
     let mut cursor = Cursor::new(blob);
     parse_any(&mut cursor)
 }
@@ -79,7 +78,7 @@ enum OffsetOrInline {
 fn parse_maybe_inlined_value(
     cursor: &mut Cursor<Vec<u8>>,
     compound_size: CompoundSize,
-) -> Result<(u8, OffsetOrInline), Error> {
+) -> Result<(u8, OffsetOrInline), JsonbParseError> {
     let t = cursor.read_u8()?;
     let inlined_value = match FieldType::from_byte(t) {
         Ok(FieldType::Literal) => match cursor.read_u16::<LittleEndian>()? {
@@ -109,7 +108,7 @@ fn parse_compound(
     mut cursor: &mut Cursor<Vec<u8>>,
     compound_size: CompoundSize,
     compound_type: CompoundType,
-) -> Result<JsonValue, Error> {
+) -> Result<JsonValue, JsonbParseError> {
     let start_offset = cursor.position();
     let (elems, _byte_size) = match compound_size {
         CompoundSize::Small => (
@@ -178,7 +177,7 @@ fn parse_compound(
     })
 }
 
-fn parse_any(cursor: &mut Cursor<Vec<u8>>) -> Result<JsonValue, Error> {
+fn parse_any(cursor: &mut Cursor<Vec<u8>>) -> Result<JsonValue, JsonbParseError> {
     let type_indicator = FieldType::from_byte(cursor.read_u8()?)?;
     parse_any_with_type_indicator(cursor, type_indicator)
 }
@@ -186,7 +185,7 @@ fn parse_any(cursor: &mut Cursor<Vec<u8>>) -> Result<JsonValue, Error> {
 fn parse_any_with_type_indicator(
     mut cursor: &mut Cursor<Vec<u8>>,
     type_indicator: FieldType,
-) -> Result<JsonValue, Error> {
+) -> Result<JsonValue, JsonbParseError> {
     match type_indicator {
         FieldType::Literal => Ok(match cursor.read_u8()? {
             0x00 => JsonValue::Null,
