@@ -283,6 +283,8 @@ fn parse_any_with_type_indicator(
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::parse;
 
     #[test]

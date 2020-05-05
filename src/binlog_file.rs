@@ -39,6 +39,7 @@ impl<I: Seek + Read> Iterator for BinlogEvents<I> {
             Some(offset) => match self.file.read_at(offset) {
                 Ok(e) => e,
                 Err(EventParseError::Io(_)) => return None,
+                Err(EventParseError::EofError) => return None,
                 Err(e) => return Some(Err(e)),
             },
             None => return None,
