@@ -90,6 +90,7 @@ pub struct BinlogEvent {
     pub rows: Vec<event::RowEvent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
+    pub offset: u64,
 }
 
 /// Iterator over [`BinlogEvent`]s
@@ -120,6 +121,7 @@ impl<BR: Read + Seek> Iterator for EventIterator<BR> {
                 Ok(event) => event,
                 Err(e) => return Some(Err(e)),
             };
+            let offset = event.offset();
             match event.inner(Some(&self.table_map)) {
                 Ok(Some(e)) => match e {
                     EventData::GtidLogEvent {
@@ -153,6 +155,7 @@ impl<BR: Read + Seek> Iterator for EventIterator<BR> {
                     }
                     EventData::QueryEvent { query, .. } => {
                         return Some(Ok(BinlogEvent {
+                            offset,
                             type_code: event.type_code(),
                             timestamp: event.timestamp(),
                             gtid: self.current_gtid,
@@ -168,6 +171,7 @@ impl<BR: Read + Seek> Iterator for EventIterator<BR> {
                     | EventData::DeleteRowsEvent { table_id, rows } => {
                         let maybe_table = self.table_map.get(table_id);
                         let message = BinlogEvent {
+                            offset,
                             type_code: event.type_code(),
                             timestamp: event.timestamp(),
                             gtid: self.current_gtid,

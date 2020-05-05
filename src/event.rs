@@ -532,4 +532,8 @@ impl Event {
     pub fn event_length(&self) -> u32 {
         self.event_length
     }
+
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
 }
