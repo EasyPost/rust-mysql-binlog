@@ -84,7 +84,7 @@ impl BitSet {
 
     pub fn is_set(&self, item: usize) -> bool {
         let byte = self.inner[self.get_byte_offset(item)];
-        (byte & (1 << (item & 0x07)) != 0)
+        byte & (1 << (item & 0x07)) != 0
     }
 
     pub fn as_vec(&self) -> Vec<bool> {
