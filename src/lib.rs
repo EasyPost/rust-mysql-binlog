@@ -67,6 +67,12 @@ impl ToString for Gtid {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct LogicalTimestamp {
+    last_committed: u64,
+    sequence_number: u64,
+}
+
 #[derive(Debug, Serialize)]
 /// A binlog event as returned by [`EventIterator`]. Filters out internal events
 /// like the TableMapEvent and simplifies mapping GTIDs to individual events.
@@ -75,6 +81,7 @@ pub struct BinlogEvent {
     // warning: Y2038 Problem ahead
     pub timestamp: u32,
     pub gtid: Option<Gtid>,
+    pub logical_timestamp: Option<LogicalTimestamp>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,6 +97,7 @@ pub struct EventIterator<BR: Read + Seek> {
     events: binlog_file::BinlogEvents<BR>,
     table_map: table_map::TableMap,
     current_gtid: Option<Gtid>,
+    logical_timestamp: Option<LogicalTimestamp>,
 }
 
 impl<BR: Read + Seek> EventIterator<BR> {
@@ -98,6 +106,7 @@ impl<BR: Read + Seek> EventIterator<BR> {
             events: bf.events(start_offset),
             table_map: table_map::TableMap::new(),
             current_gtid: None,
+            logical_timestamp: None,
         }
     }
 }
@@ -114,9 +123,23 @@ impl<BR: Read + Seek> Iterator for EventIterator<BR> {
             match event.inner(Some(&self.table_map)) {
                 Ok(Some(e)) => match e {
                     EventData::GtidLogEvent {
-                        uuid, coordinate, ..
+                        uuid,
+                        coordinate,
+                        last_committed,
+                        sequence_number,
+                        ..
                     } => {
                         self.current_gtid = Some(Gtid(uuid, coordinate));
+                        if let (Some(last_committed), Some(sequence_number)) =
+                            (last_committed, sequence_number)
+                        {
+                            self.logical_timestamp = Some(LogicalTimestamp {
+                                last_committed,
+                                sequence_number,
+                            });
+                        } else {
+                            self.logical_timestamp = None;
+                        }
                     }
                     EventData::TableMapEvent {
                         table_id,
@@ -133,6 +156,7 @@ impl<BR: Read + Seek> Iterator for EventIterator<BR> {
                             type_code: event.type_code(),
                             timestamp: event.timestamp(),
                             gtid: self.current_gtid,
+                            logical_timestamp: self.logical_timestamp,
                             table_name: None,
                             schema_name: None,
                             rows: Vec::new(),
@@ -147,6 +171,7 @@ impl<BR: Read + Seek> Iterator for EventIterator<BR> {
                             type_code: event.type_code(),
                             timestamp: event.timestamp(),
                             gtid: self.current_gtid,
+                            logical_timestamp: self.logical_timestamp,
                             table_name: maybe_table.as_ref().map(|a| a.table_name.to_owned()),
                             schema_name: maybe_table.as_ref().map(|a| a.schema_name.to_owned()),
                             rows,
