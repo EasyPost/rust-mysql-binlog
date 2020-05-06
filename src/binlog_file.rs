@@ -2,8 +2,6 @@ use std::fs::File;
 use std::io::{self, Read, Seek};
 use std::path::{Path, PathBuf};
 
-use failure::Error;
-
 use crate::errors::{BinlogParseError, EventParseError};
 use crate::event::{Event, TypeCode};
 
@@ -34,18 +32,15 @@ impl<I: Seek + Read> BinlogEvents<I> {
 }
 
 impl<I: Seek + Read> Iterator for BinlogEvents<I> {
-    type Item = Result<Event, Error>;
+    type Item = Result<Event, EventParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let event = match self.offset {
             Some(offset) => match self.file.read_at(offset) {
                 Ok(e) => e,
-                Err(e) => {
-                    if let Some(_e) = e.downcast_ref::<EventParseError>() {
-                        return None;
-                    }
-                    return Some(Err(e));
-                }
+                Err(EventParseError::Io(_)) => return None,
+                Err(EventParseError::EofError) => return None,
+                Err(e) => return Some(Err(e)),
             },
             None => return None,
         };
@@ -62,19 +57,22 @@ impl BinlogFile<File> {
     /// Construct a new BinLogFile from the given path
     ///
     /// Opens the file and reads/parses the FDE at construction time
-    pub fn try_from_path<R: AsRef<Path>>(path: R) -> Result<Self, Error> {
+    pub fn try_from_path<R: AsRef<Path>>(path: R) -> Result<Self, BinlogParseError> {
         let p = path.as_ref();
-        let fh = File::open(p)?;
+        let fh = File::open(p).map_err(BinlogParseError::OpenError)?;
         Self::try_new_from_reader_name(fh, Some(p.to_owned()))
     }
 }
 
 impl<I: Seek + Read> BinlogFile<I> {
-    pub fn try_from_reader(reader: I) -> Result<Self, Error> {
+    pub fn try_from_reader(reader: I) -> Result<Self, BinlogParseError> {
         Self::try_new_from_reader_name(reader, None)
     }
 
-    fn try_new_from_reader_name(mut fh: I, name: Option<PathBuf>) -> Result<Self, Error> {
+    fn try_new_from_reader_name(
+        mut fh: I,
+        name: Option<PathBuf>,
+    ) -> Result<Self, BinlogParseError> {
         // read the magic bytes
         let mut magic = [0u8; 4];
         fh.read_exact(&mut magic)?;
@@ -94,7 +92,7 @@ impl<I: Seek + Read> BinlogFile<I> {
         })
     }
 
-    fn read_at(&mut self, offset: u64) -> Result<Event, Error> {
+    fn read_at(&mut self, offset: u64) -> Result<Event, EventParseError> {
         self.file.seek(io::SeekFrom::Start(offset))?;
         Event::read(&mut self.file, offset).map_err(|i| i.into())
     }

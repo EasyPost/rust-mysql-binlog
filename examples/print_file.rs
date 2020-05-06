@@ -1,10 +1,9 @@
 use std::io::Write;
 
-use serde_json;
 use mysql_binlog;
-use failure;
+use serde_json;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 2 {
         eprintln!("Usage: {} /path/to/binlog/file", args[0]);

@@ -1,7 +1,6 @@
 use std::io::{self, Read};
 
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
-use failure::Error;
 
 use crate::errors::ColumnParseError;
 use crate::jsonb;
@@ -133,7 +132,7 @@ impl ColumnType {
         })
     }
 
-    pub fn read_value<R: Read>(&self, r: &mut R) -> Result<MySQLValue, Error> {
+    pub fn read_value<R: Read>(&self, r: &mut R) -> Result<MySQLValue, ColumnParseError> {
         match self {
             &ColumnType::Tiny => Ok(MySQLValue::SignedInteger(i64::from(r.read_i8()?))),
             &ColumnType::Short => Ok(MySQLValue::SignedInteger(i64::from(

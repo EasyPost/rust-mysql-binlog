@@ -1,27 +1,33 @@
 use crate::column_types;
+use thiserror::Error;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum EventParseError {
-    #[fail(display = "column parse error")]
-    ColumnParseError(ColumnParseError),
-    #[fail(display = "unexpected EOF")]
+    #[error("unable to parse column: {0:?}")]
+    ColumnParseError(#[from] ColumnParseError),
+    #[error("I/O error reading column: {0:?}")]
+    Io(#[from] ::std::io::Error),
+    #[error("unexpected EOF")]
     EofError,
+    #[error("bad UUID in Gtid Event: {0:?}")]
+    Uuid(#[from] uuid::Error),
 }
 
-impl From<ColumnParseError> for EventParseError {
-    fn from(e: ColumnParseError) -> Self {
-        EventParseError::ColumnParseError(e)
-    }
-}
-
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum JsonbParseError {
-    #[fail(display = "invalid type byte")]
+    #[error("invalid type byte (got {0})")]
     InvalidTypeByte(u8),
-    #[fail(display = "invalid type literal byte")]
+    #[error("invalid type literal (got {0})")]
     InvalidLiteral(u16),
-    #[fail(display = "error parsing opaque column in json record: {:?}", inner)]
-    OpaqueColumnParseError { inner: Box<ColumnParseError> },
+    #[error("I/O error reading JSONB value: {0:?}")]
+    Io(#[from] ::std::io::Error),
+    #[error("invalid JSON")]
+    Json(#[from] serde_json::error::Error),
+    #[error("error parsing opaque column in json record: {inner:?}")]
+    OpaqueColumnParseError {
+        #[source]
+        inner: Box<ColumnParseError>,
+    },
 }
 
 impl From<ColumnParseError> for JsonbParseError {
@@ -30,34 +36,38 @@ impl From<ColumnParseError> for JsonbParseError {
     }
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum ColumnParseError {
-    #[fail(display = "unimplemented column type: {:?}", column_type)]
+    #[error("unimplemented column type: {column_type:?}")]
     UnimplementedTypeError {
         column_type: column_types::ColumnType,
     },
-    #[fail(display = "error parsing JSON column")]
-    JsonError(JsonbParseError),
+    #[error("error parsing JSON column")]
+    Json(#[from] JsonbParseError),
+    #[error("error parcing Decimal column")]
+    Decimal(#[from] DecimalParseError),
+    #[error("I/O error reading column")]
+    Io(#[from] std::io::Error),
 }
 
-impl From<JsonbParseError> for ColumnParseError {
-    fn from(e: JsonbParseError) -> Self {
-        ColumnParseError::JsonError(e)
-    }
-}
-
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum BinlogParseError {
-    #[fail(display = "error parsing event")]
-    EventParseError(EventParseError),
-    #[fail(display = "bad magic value at start of binlog")]
+    #[error("error parsing event")]
+    EventParseError(#[from] EventParseError),
+    #[error("bad magic value at start of binlog: got {0:?}")]
     BadMagic([u8; 4]),
-    #[fail(display = "bad first record in binlog")]
+    #[error("bad first record in binlog")]
     BadFirstRecord,
+    #[error("error opening binlog file")]
+    OpenError(std::io::Error),
+    #[error("other I/O error reading binlog file")]
+    Io(#[from] std::io::Error),
 }
 
-impl From<EventParseError> for BinlogParseError {
-    fn from(e: EventParseError) -> Self {
-        BinlogParseError::EventParseError(e)
-    }
+#[derive(Debug, Error)]
+pub enum DecimalParseError {
+    #[error("I/O error reading decimal")]
+    Io(#[from] std::io::Error),
+    #[error("Decimal parse error")]
+    BigDecimalParse(#[from] bigdecimal::ParseBigDecimalError),
 }

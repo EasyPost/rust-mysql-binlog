@@ -1,5 +1,7 @@
 use std::io::{self, Cursor, Read};
 
+use crate::errors::DecimalParseError;
+
 use bigdecimal::BigDecimal;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
 
@@ -129,7 +131,7 @@ pub(crate) fn read_new_decimal<R: Read>(
     r: &mut R,
     precision: u8,
     decimal: u8,
-) -> Result<BigDecimal, failure::Error> {
+) -> Result<BigDecimal, DecimalParseError> {
     // like every other binlog parser's implementation, this code
     // is a transliteration of https://github.com/jeremycole/mysql_binlog/blob/master/lib/mysql_binlog/binlog_field_parser.rb#L233
     // because this format is bananas
@@ -175,10 +177,8 @@ pub(crate) fn read_new_decimal<R: Read>(
                 .to_string(),
         )
     }
-    components
-        .join("")
-        .parse::<BigDecimal>()
-        .map_err(|e| failure::Error::from_boxed_compat(Box::new(e)))
+    let decimal = components.join("").parse::<BigDecimal>()?;
+    Ok(decimal)
 }
 
 pub(crate) fn read_datetime_subsecond_part<R: Read>(r: &mut R, pack_length: u8) -> io::Result<u32> {

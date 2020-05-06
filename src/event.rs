@@ -2,12 +2,12 @@ use std::fmt;
 use std::io::{self, Cursor, ErrorKind, Read, Seek};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-use failure::Error;
+use serde_derive::Serialize;
 use uuid::Uuid;
 
 use crate::bit_set::BitSet;
 use crate::column_types::ColumnType;
-use crate::errors::EventParseError;
+use crate::errors::{ColumnParseError, EventParseError};
 use crate::packet_helpers::*;
 use crate::table_map::{SingleTableMap, TableMap};
 use crate::tell::Tell;
@@ -171,7 +171,7 @@ fn parse_one_row<R: Read + Seek>(
     mut cursor: &mut R,
     this_table_map: &SingleTableMap,
     present_bitmask: &BitSet,
-) -> Result<RowData, Error> {
+) -> Result<RowData, ColumnParseError> {
     let num_set_columns = present_bitmask.bits_set();
     let null_bitmask_size = (num_set_columns + 7) >> 3;
     let mut row = Vec::with_capacity(this_table_map.columns.len());
@@ -230,7 +230,7 @@ fn parse_rows_event<R: Read + Seek>(
     data_len: usize,
     mut cursor: &mut R,
     table_map: Option<&TableMap>,
-) -> Result<RowsEvent, Error> {
+) -> Result<RowsEvent, ColumnParseError> {
     let mut table_id_buf = [0u8; 8];
     cursor.read_exact(&mut table_id_buf[0..6])?;
     let table_id = LittleEndian::read_u64(&table_id_buf);
@@ -306,7 +306,7 @@ impl EventData {
         type_code: TypeCode,
         data: &[u8],
         table_map: Option<&TableMap>,
-    ) -> Result<Option<Self>, Error> {
+    ) -> Result<Option<Self>, EventParseError> {
         let mut cursor = Cursor::new(data);
         match type_code {
             TypeCode::FormatDescriptionEvent => {
@@ -344,7 +344,7 @@ impl EventData {
                 let flags = cursor.read_u8()?;
                 let mut uuid_buf = [0u8; 16];
                 cursor.read_exact(&mut uuid_buf)?;
-                let uuid = Uuid::from_bytes(&uuid_buf)?;
+                let uuid = Uuid::from_slice(&uuid_buf)?;
                 let offset = cursor.read_u64::<LittleEndian>()?;
                 let (last_committed, sequence_number) = match cursor.read_u8() {
                     Ok(0x02) => {
@@ -469,7 +469,7 @@ impl fmt::Debug for Event {
 const HAS_CHECKSUM: bool = true;
 
 impl Event {
-    pub fn read<R: Read>(reader: &mut R, offset: u64) -> Result<Self, Error> {
+    pub fn read<R: Read>(reader: &mut R, offset: u64) -> Result<Self, EventParseError> {
         let mut header = [0u8; 19];
         match reader.read_exact(&mut header) {
             Ok(_) => {}
@@ -517,8 +517,11 @@ impl Event {
         u64::from(self.next_position)
     }
 
-    pub fn inner(&self, table_map: Option<&TableMap>) -> Result<Option<EventData>, Error> {
-        EventData::from_data(self.type_code, &self.data, table_map)
+    pub fn inner(
+        &self,
+        table_map: Option<&TableMap>,
+    ) -> Result<Option<EventData>, EventParseError> {
+        EventData::from_data(self.type_code, &self.data, table_map).map_err(Into::into)
     }
 
     pub fn data(&self) -> &Vec<u8> {

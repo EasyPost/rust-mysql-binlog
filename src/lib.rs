@@ -16,19 +16,6 @@
 //!     }
 //! }
 //! ```
-extern crate base64;
-extern crate byteorder;
-extern crate uuid;
-#[macro_use]
-extern crate failure;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-#[cfg_attr(test, macro_use)]
-extern crate serde_json;
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;
 
 use std::fs::File;
 use std::io::{Read, Seek};
@@ -46,6 +33,9 @@ mod tell;
 pub mod value;
 
 use event::EventData;
+use serde_derive::Serialize;
+
+use errors::{BinlogParseError, EventParseError};
 
 #[derive(Debug, Clone, Copy)]
 /// Global Transaction ID
@@ -56,14 +46,14 @@ impl serde::Serialize for Gtid {
     where
         S: serde::Serializer,
     {
-        let serialized = format!("{}:{}", self.0.hyphenated(), self.1);
+        let serialized = format!("{}:{}", self.0.to_hyphenated(), self.1);
         serializer.serialize_str(&serialized)
     }
 }
 
 impl ToString for Gtid {
     fn to_string(&self) -> String {
-        format!("{}:{}", self.0.hyphenated(), self.1)
+        format!("{}:{}", self.0.to_hyphenated(), self.1)
     }
 }
 
@@ -113,7 +103,7 @@ impl<BR: Read + Seek> EventIterator<BR> {
 }
 
 impl<BR: Read + Seek> Iterator for EventIterator<BR> {
-    type Item = Result<BinlogEvent, failure::Error>;
+    type Item = Result<BinlogEvent, EventParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(event) = self.events.next() {
@@ -206,7 +196,7 @@ pub struct BinlogFileParserBuilder<BR: Read + Seek> {
 
 impl BinlogFileParserBuilder<File> {
     /// Construct a new BinlogFileParserBuilder from some path
-    pub fn try_from_path<P: AsRef<Path>>(file_name: P) -> Result<Self, failure::Error> {
+    pub fn try_from_path<P: AsRef<Path>>(file_name: P) -> Result<Self, BinlogParseError> {
         let bf = binlog_file::BinlogFile::try_from_path(file_name.as_ref())?;
         Ok(BinlogFileParserBuilder {
             bf: bf,
@@ -217,7 +207,7 @@ impl BinlogFileParserBuilder<File> {
 
 impl<BR: Read + Seek> BinlogFileParserBuilder<BR> {
     /// Construct a new BinlogFileParserBuilder from some object implementing Read and Seek
-    pub fn try_from_reader(r: BR) -> Result<Self, failure::Error> {
+    pub fn try_from_reader(r: BR) -> Result<Self, BinlogParseError> {
         let bf = binlog_file::BinlogFile::try_from_reader(r)?;
         Ok(BinlogFileParserBuilder {
             bf: bf,
@@ -245,7 +235,7 @@ impl<BR: Read + Seek> BinlogFileParserBuilder<BR> {
 ///
 /// - returns an immediate error if the Read does not begin with a valid Format Descriptor Event
 /// - each call to the iterator can return an error if there is an I/O or parsing error
-pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<EventIterator<R>, failure::Error> {
+pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<EventIterator<R>, BinlogParseError> {
     BinlogFileParserBuilder::try_from_reader(r).map(|b| b.build())
 }
 
@@ -255,12 +245,14 @@ pub fn parse_reader<R: Read + Seek + 'static>(r: R) -> Result<EventIterator<R>, 
 ///
 /// - returns an immediate error if the file could not be opened or if it does not contain a valid Format Desciptor Event
 /// - each call to the iterator can return an error if there is an I/O or parsing error
-pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<EventIterator<File>, failure::Error> {
+pub fn parse_file<P: AsRef<Path>>(file_name: P) -> Result<EventIterator<File>, BinlogParseError> {
     BinlogFileParserBuilder::try_from_path(file_name).map(|b| b.build())
 }
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
+
     use bigdecimal::BigDecimal;
 
     use super::{parse_file, parse_reader};
