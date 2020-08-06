@@ -78,10 +78,15 @@ pub(crate) fn read_var_byte_length_prefixed_bytes<R: Read>(
 ) -> io::Result<Vec<u8>> {
     let len = match pl {
         1 => r.read_u8()? as usize,
-        2 => r.read_i16::<LittleEndian>()? as usize,
+        2 => r.read_u16::<LittleEndian>()? as usize,
+        3 => {
+            let mut buf = [0u8; 4];
+            r.read_exact(&mut buf[1..4])?;
+            byteorder::LittleEndian::read_u32(&buf) as usize
+        },
         4 => r.read_u32::<LittleEndian>()? as usize,
         8 => r.read_u64::<LittleEndian>()? as usize,
-        _ => unreachable!(),
+        l => unreachable!(format!("got unexpected length {0:?}", l))
     };
     read_nbytes(r, len)
 }
