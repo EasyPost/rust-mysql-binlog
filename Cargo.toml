@@ -1,6 +1,6 @@
 [package]
 name = "mysql_binlog"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["James Brown <jbrown@easypost.com>"]
 description = "Parser for the MySQL binlog format"
 documentation = "https://docs.rs/mysql_binlog"
@@ -18,7 +18,7 @@ thiserror = "1.0"
 serde_json = "1"
 serde = "1"
 serde_derive = "1"
-bigdecimal = { version="^0.0.15", features=["serde"] }
+bigdecimal = { version="^0.1.2", features=["serde"] }
 
 [dev-dependencies]
 assert_matches = "1"

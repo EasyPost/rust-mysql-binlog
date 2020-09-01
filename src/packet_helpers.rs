@@ -83,10 +83,10 @@ pub(crate) fn read_var_byte_length_prefixed_bytes<R: Read>(
             let mut buf = [0u8; 4];
             r.read_exact(&mut buf[0..3])?;
             byteorder::LittleEndian::read_u32(&buf) as usize
-        },
+        }
         4 => r.read_u32::<LittleEndian>()? as usize,
         8 => r.read_u64::<LittleEndian>()? as usize,
-        l => unreachable!(format!("got unexpected length {0:?}", l))
+        l => unreachable!(format!("got unexpected length {0:?}", l)),
     };
     read_nbytes(r, len)
 }
@@ -233,12 +233,20 @@ mod tests {
             (1, vec![0x01, 0x09], vec![0x09]),
             (2, vec![0x01, 0x00, 0x0a], vec![0x0a]),
             (3, vec![0x01, 0x00, 0x00, 0x0b], vec![0x0b]),
-            (4, vec![0x02, 0x00, 0x00, 0x00, 0x0c, 0x0d], vec![0x0c, 0x0d]),
-            (8, vec![0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xe, 0xa], vec![0xd, 0xe, 0xa]),
+            (
+                4,
+                vec![0x02, 0x00, 0x00, 0x00, 0x0c, 0x0d],
+                vec![0x0c, 0x0d],
+            ),
+            (
+                8,
+                vec![
+                    0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0xe, 0xa,
+                ],
+                vec![0xd, 0xe, 0xa],
+            ),
         ] {
-            let mut uut = Cursor::new(
-                input
-            );
+            let mut uut = Cursor::new(input);
             assert_eq!(
                 &read_var_byte_length_prefixed_bytes(&mut uut, *byte_length).expect("should be ok"),
                 expected_output

@@ -1,5 +1,10 @@
 # ChangeLog
 
+## [0.3.1] - 2020-08-31
+
+ - handle 3-byte varint length prefixes on blobs
+ - update from `bigdecimal` 0.0 to `bigdecimal` 0.1
+
 ## [0.3.0] - 2020-05-05
 
  - expose logical timestamps when available (so you can debug parallel replication)
