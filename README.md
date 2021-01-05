@@ -1,6 +1,6 @@
 `mysql_binlog` is a clean, idomatic Rust implementation of a MySQL binlog parser, including support for the JSONB type introduced in MySQL 5.7.
 
-[![Build Status](https://travis-ci.com/EasyPost/rust-mysql-binlog.svg?branch=master)](https://travis-ci.com/EasyPost/rust-mysql-binlog)
+[![CI](https://github.com/EasyPost/rust-mysql-binlog/workflows/CI/badge.svg)](https://github.com/EasyPost/rust-mysql-binlog/actions?query=workflow%3ACI)
 [![crates.io](https://meritbadge.herokuapp.com/mysql_binlog)](https://crates.io/crates/mysql_binlog)
 [![docs](https://docs.rs/mysql_binlog/badge.svg)](https://docs.rs/mysql_binlog)
 
