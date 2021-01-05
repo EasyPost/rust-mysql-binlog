@@ -312,8 +312,7 @@ impl ColumnType {
                 // not implemented by MySQL
                 Err(ColumnParseError::UnimplementedTypeError {
                     column_type: self.clone(),
-                }
-                .into())
+                })
             }
             &ColumnType::Decimal
             | &ColumnType::NewDate

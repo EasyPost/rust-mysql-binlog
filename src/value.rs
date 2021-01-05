@@ -1,10 +1,7 @@
-use base64;
-
 use std::borrow::Cow;
 
 use serde::{Serialize, Serializer};
 use serde_derive::Serialize;
-use serde_json;
 
 #[derive(Debug)]
 /// Wrapper for the SQL BLOB (Binary Large OBject) type

@@ -40,7 +40,7 @@ pub(crate) fn read_known_length_integer_be<R: Read>(r: &mut R, bytes: usize) -> 
             buf[0] &= 0x7f;
             let num: i64 = (i64::from(buf[0]) << 16) | (i64::from(buf[1]) << 8) | i64::from(buf[2]);
             if is_neg {
-                -1 * num
+                -num
             } else {
                 num
             }

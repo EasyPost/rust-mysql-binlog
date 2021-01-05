@@ -77,13 +77,13 @@ impl<I: Seek + Read> BinlogFile<I> {
         let mut magic = [0u8; 4];
         fh.read_exact(&mut magic)?;
         if magic != [0xfeu8, 0x62, 0x69, 0x6e] {
-            return Err(BinlogParseError::BadMagic(magic).into());
+            return Err(BinlogParseError::BadMagic(magic));
         }
         let fde = Event::read(&mut fh, 4)?;
         if fde.inner(None)?.is_some() {
             // XXX: todo: thread through common_header_len
         } else {
-            return Err(BinlogParseError::BadFirstRecord.into());
+            return Err(BinlogParseError::BadFirstRecord);
         }
         Ok(BinlogFile {
             file_name: name,
@@ -94,7 +94,7 @@ impl<I: Seek + Read> BinlogFile<I> {
 
     fn read_at(&mut self, offset: u64) -> Result<Event, EventParseError> {
         self.file.seek(io::SeekFrom::Start(offset))?;
-        Event::read(&mut self.file, offset).map_err(|i| i.into())
+        Event::read(&mut self.file, offset)
     }
 
     /// Iterate throgh events in this BinLog file, optionally from the given

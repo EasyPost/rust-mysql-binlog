@@ -17,6 +17,12 @@ pub struct TableMap {
     inner: BTreeMap<u64, SingleTableMap>,
 }
 
+impl Default for TableMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TableMap {
     pub fn new() -> Self {
         TableMap {
