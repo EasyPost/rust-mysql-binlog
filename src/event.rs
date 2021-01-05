@@ -474,7 +474,7 @@ impl Event {
         match reader.read_exact(&mut header) {
             Ok(_) => {}
             Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
-                return Err(EventParseError::EofError.into())
+                return Err(EventParseError::EofError)
             }
             Err(e) => return Err(e.into()),
         }

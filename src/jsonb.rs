@@ -4,7 +4,6 @@
 use std::io::Cursor;
 use std::iter::FromIterator;
 
-use base64;
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde_json::map::Map as JsonMap;
 use serde_json::Value as JsonValue;
@@ -85,7 +84,7 @@ fn parse_maybe_inlined_value(
             0x00 => JsonValue::Null,
             0x01 => JsonValue::Bool(true),
             0x02 => JsonValue::Bool(false),
-            i => return Err(JsonbParseError::InvalidLiteral(i).into()),
+            i => return Err(JsonbParseError::InvalidLiteral(i)),
         },
         Ok(FieldType::Uint16) => JsonValue::from(cursor.read_u16::<LittleEndian>()?),
         Ok(FieldType::Int16) => JsonValue::from(cursor.read_i16::<LittleEndian>()?),
@@ -191,7 +190,7 @@ fn parse_any_with_type_indicator(
             0x00 => JsonValue::Null,
             0x01 => JsonValue::Bool(true),
             0x02 => JsonValue::Bool(false),
-            i => return Err(JsonbParseError::InvalidLiteral(u16::from(i)).into()),
+            i => return Err(JsonbParseError::InvalidLiteral(u16::from(i))),
         }),
         FieldType::Int16 => {
             let val = cursor.read_i16::<LittleEndian>()?;

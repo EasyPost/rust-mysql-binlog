@@ -64,21 +64,20 @@ impl BitSet {
         item >> 3
     }
 
-    pub fn set_value(&mut self, item: usize, value: bool) -> () {
+    pub fn set_value(&mut self, item: usize, value: bool) {
         let offset = self.get_byte_offset(item);
         if value {
             self.inner[offset] |= 1 << (item & 0x07);
         } else {
             self.inner[offset] &= !(1 << (item & 0x07));
         }
-        ()
     }
 
-    pub fn set(&mut self, item: usize) -> () {
+    pub fn set(&mut self, item: usize) {
         self.set_value(item, true)
     }
 
-    pub fn unset(&mut self, item: usize) -> () {
+    pub fn unset(&mut self, item: usize) {
         self.set_value(item, false)
     }
 
