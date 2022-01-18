@@ -31,7 +31,7 @@ mod tell;
 pub mod value;
 
 use event::EventData;
-use serde_derive::Serialize;
+use serde::Serialize;
 
 use errors::{BinlogParseError, EventParseError};
 
@@ -104,7 +104,7 @@ impl<BR: Read + Seek> Iterator for EventIterator<BR> {
     type Item = Result<BinlogEvent, EventParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(event) = self.events.next() {
+        for event in self.events.by_ref() {
             let event = match event {
                 Ok(event) => event,
                 Err(e) => return Some(Err(e)),
