@@ -104,7 +104,7 @@ fn parse_maybe_inlined_value(
 }
 
 fn parse_compound(
-    mut cursor: &mut Cursor<Vec<u8>>,
+    cursor: &mut Cursor<Vec<u8>>,
     compound_size: CompoundSize,
     compound_type: CompoundType,
 ) -> Result<JsonValue, JsonbParseError> {
@@ -138,14 +138,14 @@ fn parse_compound(
     let value_offsets = {
         let mut offsets = Vec::with_capacity(elems);
         for _ in 0..elems {
-            offsets.push(parse_maybe_inlined_value(&mut cursor, compound_size)?);
+            offsets.push(parse_maybe_inlined_value(cursor, compound_size)?);
         }
         offsets
     };
     let keys = if let Some(key_offsets) = key_offsets {
         let mut keys = Vec::with_capacity(elems);
         for (_, size) in key_offsets.into_iter() {
-            let key = packet_helpers::read_nbytes(&mut cursor, size)?;
+            let key = packet_helpers::read_nbytes(cursor, size)?;
             let key = String::from_utf8_lossy(&key).into_owned();
             keys.push(key);
         }
@@ -224,18 +224,10 @@ fn parse_any_with_type_indicator(
             let val = packet_helpers::read_variable_length_string(&mut cursor)?;
             Ok(JsonValue::from(val))
         }
-        FieldType::SmallObject => {
-            parse_compound(&mut cursor, CompoundSize::Small, CompoundType::Object)
-        }
-        FieldType::LargeObject => {
-            parse_compound(&mut cursor, CompoundSize::Large, CompoundType::Object)
-        }
-        FieldType::SmallArray => {
-            parse_compound(&mut cursor, CompoundSize::Small, CompoundType::Array)
-        }
-        FieldType::LargeArray => {
-            parse_compound(&mut cursor, CompoundSize::Large, CompoundType::Array)
-        }
+        FieldType::SmallObject => parse_compound(cursor, CompoundSize::Small, CompoundType::Object),
+        FieldType::LargeObject => parse_compound(cursor, CompoundSize::Large, CompoundType::Object),
+        FieldType::SmallArray => parse_compound(cursor, CompoundSize::Small, CompoundType::Array),
+        FieldType::LargeArray => parse_compound(cursor, CompoundSize::Large, CompoundType::Array),
         FieldType::Custom => {
             /* augh apparently MySQL has this "neat" feature where it can encode any MySQL type
              * inside JSON.

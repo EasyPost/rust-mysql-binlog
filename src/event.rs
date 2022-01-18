@@ -2,7 +2,7 @@ use std::fmt;
 use std::io::{self, Cursor, ErrorKind, Read, Seek};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-use serde_derive::Serialize;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::bit_set::BitSet;

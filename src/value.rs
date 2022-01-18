@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use serde::{Serialize, Serializer};
-use serde_derive::Serialize;
 
 #[derive(Debug)]
 /// Wrapper for the SQL BLOB (Binary Large OBject) type
