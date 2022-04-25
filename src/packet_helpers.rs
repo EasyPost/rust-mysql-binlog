@@ -86,7 +86,7 @@ pub(crate) fn read_var_byte_length_prefixed_bytes<R: Read>(
         }
         4 => r.read_u32::<LittleEndian>()? as usize,
         8 => r.read_u64::<LittleEndian>()? as usize,
-        l => unreachable!(format!("got unexpected length {0:?}", l)),
+        l => unreachable!("got unexpected length {0:?}", l),
     };
     read_nbytes(r, len)
 }
