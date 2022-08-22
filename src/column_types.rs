@@ -117,7 +117,18 @@ impl ColumnType {
                 // XXX todo this actually includes some of the bits from f1
                 match real_type {
                     ColumnType::Enum(_) => ColumnType::Enum(real_size),
-                    i => unimplemented!("unimplemented stringy type {:?}", i),
+                    ColumnType::MyString => {
+                        let param_data = (f1 as u16) << 8 | (f2 as u16);
+                        // Field_string::unpack in field.cc
+                        let from_length =
+                            (((param_data >> 4) & 0x300) ^ 0x300) + (param_data & 0x00ff);
+                        ColumnType::VarChar(from_length)
+                    }
+                    i => unimplemented!(
+                        "unimplemented stringy type {:?} real_size={:?}",
+                        i,
+                        real_size
+                    ),
                 }
             }
             ColumnType::Enum(_) => {
