@@ -3,10 +3,10 @@ use std::borrow::Cow;
 use serde::{Serialize, Serializer};
 
 #[derive(Debug)]
-/// Wrapper for the SQL BLOB (Binary Large OBject) type
+/// Wrapper for the SQL BLOB (Binary Large OBject) and TEXT types
 ///
 /// Serializes as Base64
-pub struct Blob(Vec<u8>);
+pub struct Blob(pub Vec<u8>);
 
 impl From<Vec<u8>> for Blob {
     fn from(v: Vec<u8>) -> Self {
